@@ -34,16 +34,16 @@ fn main() {
         )
         .get_matches();
 
-    if matches.is_present("app") {
+    if passgen.is_present("app") {
         let name = matches.value_of("app").unwrap();
         functionalities::generate_save_safety_password(name);
     }
 
-    if matches.is_present("list") {
+    if passgen.is_present("list") {
         functionalities::show_list_applications();
     }
 
-    if matches.is_present("get") {
+    if passgen.is_present("get") {
         let name = matches.value_of("get").unwrap();
         functionalities::get_password_for_specify_app(name);
     }
