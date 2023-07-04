@@ -35,7 +35,7 @@ fn main() {
         .get_matches();
 
     if passgen.is_present("app") {
-        let name = matches.value_of("app").unwrap();
+        let name = passgen.value_of("app").unwrap();
         functionalities::generate_save_safety_password(name);
     }
 
@@ -44,7 +44,7 @@ fn main() {
     }
 
     if passgen.is_present("get") {
-        let name = matches.value_of("get").unwrap();
+        let name = passgen.value_of("get").unwrap();
         functionalities::get_password_for_specify_app(name);
     }
 }
