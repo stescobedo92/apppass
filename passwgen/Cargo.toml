@@ -1,5 +1,5 @@
 [package]
-name = "genpass"
+name = "apppass"
 version = "0.1.0"
 edition = "2021"
 authors = ["Sergio Triana Escobedo <stescobedo.31@gmail.com>"]

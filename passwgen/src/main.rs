@@ -3,7 +3,7 @@ mod functionalities;
 use clap::{App, Arg };
 
 fn main() {
-    let passgen = App::new("genpass")
+    let apppass = App::new("apppass")
         .version("1.0")
         .author("Sergio Triana Escobedo")
         .about("Generate secure passwords for your applications.")
@@ -34,17 +34,17 @@ fn main() {
         )
         .get_matches();
 
-    if passgen.is_present("app") {
-        let name = passgen.value_of("app").unwrap();
+    if apppass.is_present("app") {
+        let name = apppass.value_of("app").unwrap();
         functionalities::generate_save_safety_password(name);
     }
 
-    if passgen.is_present("list") {
+    if apppass.is_present("list") {
         functionalities::show_list_applications();
     }
 
-    if passgen.is_present("get") {
-        let name = passgen.value_of("get").unwrap();
+    if apppass.is_present("get") {
+        let name = apppass.value_of("get").unwrap();
         functionalities::get_password_for_specify_app(name);
     }
 }
