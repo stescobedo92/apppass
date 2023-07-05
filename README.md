@@ -6,6 +6,10 @@
 
 # Getting Started
 
+If you don't have Rust installed, don't worry, you can download the available release from the repository.
+
+On the other hand, if you have Rust installed, you can use Cargo to obtain and use the application as follows:
+
 ```
 $ cargo install apppass
 ```
