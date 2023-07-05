@@ -3,7 +3,7 @@ mod functionalities;
 use clap::{App, Arg };
 
 fn main() {
-    let passgen = App::new("passgen")
+    let passgen = App::new("genpass")
         .version("1.0")
         .author("Sergio Triana Escobedo")
         .about("Generate secure passwords for your applications.")

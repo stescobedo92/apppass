@@ -1,5 +1,5 @@
 [package]
-name = "passgen"
+name = "genpass"
 version = "0.1.0"
 edition = "2021"
 authors = ["Sergio Triana Escobedo <stescobedo.31@gmail.com>"]
