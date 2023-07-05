@@ -8,6 +8,7 @@ description = "Generate secure passwords for your applications."
 homepage = "https://github.com/stescobedo92/apppass"
 repository = "https://github.com/stescobedo92/apppass"
 keywords = ["cli"]
+readme = "README.md"
 categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
