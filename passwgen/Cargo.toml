@@ -5,8 +5,8 @@ edition = "2021"
 authors = ["Sergio Triana Escobedo <stescobedo.31@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Generate secure passwords for your applications."
-homepage = "https://github.com/stescobedo92/passgen"
-repository = "https://github.com/stescobedo92/passgen"
+homepage = "https://github.com/stescobedo92/apppass"
+repository = "https://github.com/stescobedo92/apppass"
 keywords = ["cli"]
 categories = ["command-line-utilities"]
 
