@@ -1,6 +1,6 @@
 [package]
 name = "apppass"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["Sergio Triana Escobedo <stescobedo.31@gmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -15,5 +15,5 @@ categories = ["command-line-utilities"]
 
 [dependencies]
 rand = "0.8.5"
-clap = "2.33.3"
+clap = "4.5.26"
 once_cell = "1.8"
