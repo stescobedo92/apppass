@@ -115,3 +115,16 @@ pub fn update_password(app_name: &str, new_password: &str) {
         println!("Application '{}' not found.", app_name);
     }
 }
+
+pub fn export_passwords(file_path: &str) {
+    fill_data();
+    let application_data = APPLICATION_DATA.lock().unwrap();
+
+    let mut file = File::create(file_path).expect("Failed to create export file");
+
+    for (app, pass) in application_data.iter() {
+        writeln!(file, "{},{}", app, pass).expect("Failed to write to export file");
+    }
+
+    println!("Passwords exported to '{}'.", file_path);
+}
