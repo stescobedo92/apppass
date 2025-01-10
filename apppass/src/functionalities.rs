@@ -9,6 +9,7 @@ const FILE_NAME: &str = "passwords";
 
 static APPLICATION_DATA: Lazy<std::sync::Mutex<HashMap<String, String>>> = Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
 
+/// Fills the `APPLICATION_DATA` with data from the file specified by `FILE_NAME`.
 fn fill_data() {
     let mut application_data = APPLICATION_DATA.lock().unwrap();
     let file = File::open(FILE_NAME).expect("Could not open the file");
@@ -26,6 +27,11 @@ fn fill_data() {
     }
 }
 
+/// Generates a random password, saves it to the file, and updates the application data.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application.
 pub fn generate_save_safety_password(app_name: &str) {
 
     let rand_password: String = thread_rng()
@@ -50,6 +56,7 @@ pub fn generate_save_safety_password(app_name: &str) {
     println!("Password generated and saved for the application: {}", app_name);
 }
 
+/// Shows a list of all applications and their passwords.
 pub fn show_list_applications() {
     fill_data();
     let application_data = APPLICATION_DATA.lock().unwrap();
@@ -61,6 +68,11 @@ pub fn show_list_applications() {
     }
 }
 
+/// Retrieves the password for a specified application.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application.
 pub fn get_password_for_specify_app(app_name: &str) {
     fill_data();
     let application_data = APPLICATION_DATA.lock().unwrap();
@@ -78,6 +90,11 @@ pub fn get_password_for_specify_app(app_name: &str) {
     }
 }
 
+/// Deletes the password for a specified application.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application.
 pub fn delete_password(app_name: &str) {
     fill_data();
     let mut application_data = APPLICATION_DATA.lock().unwrap();
@@ -96,6 +113,12 @@ pub fn delete_password(app_name: &str) {
     }
 }
 
+/// Updates the password for a specified application.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application.
+/// * `new_password` - A string slice that holds the new password for the application.
 pub fn update_password(app_name: &str, new_password: &str) {
     fill_data();
     let mut application_data = APPLICATION_DATA.lock().unwrap();
@@ -116,6 +139,11 @@ pub fn update_password(app_name: &str, new_password: &str) {
     }
 }
 
+/// Exports all stored passwords to a specified file.
+///
+/// # Arguments
+///
+/// * `file_path` - A string slice that holds the path to the file where passwords will be exported.
 pub fn export_passwords(file_path: &str) {
     fill_data();
     let application_data = APPLICATION_DATA.lock().unwrap();
@@ -127,4 +155,37 @@ pub fn export_passwords(file_path: &str) {
     }
 
     println!("Passwords exported to '{}'.", file_path);
+}
+
+/// Imports passwords from a specified file.
+///
+/// # Arguments
+///
+/// * `file_path` - A string slice that holds the path to the file to import passwords from.
+pub fn import_passwords(file_path: &str) {
+    let file = File::open(file_path).expect("Failed to open import file");
+    let reader = BufReader::new(file);
+
+    let mut application_data = APPLICATION_DATA.lock().unwrap();
+
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            let key_value: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
+            if key_value.len() == 2 {
+                let app_name = key_value[0].to_string();
+                let password = key_value[1].to_string();
+                application_data.insert(app_name, password);
+            }
+        }
+    }
+
+    let new_content: String = application_data
+        .iter()
+        .map(|(app, pass)| format!("{},{}", app, pass))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    std::fs::write(FILE_NAME, new_content).expect("Unable to write to file");
+
+    println!("Passwords imported from '{}'.", file_path);
 }
