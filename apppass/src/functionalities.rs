@@ -95,3 +95,23 @@ pub fn delete_password(app_name: &str) {
         println!("Application '{}' not found.", app_name);
     }
 }
+
+pub fn update_password(app_name: &str, new_password: &str) {
+    fill_data();
+    let mut application_data = APPLICATION_DATA.lock().unwrap();
+
+    if application_data.contains_key(app_name) {
+        application_data.insert(app_name.to_string(), new_password.to_string());
+
+        let new_content: String = application_data
+            .iter()
+            .map(|(app, pass)| format!("{},{}", app, pass))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        std::fs::write(FILE_NAME, new_content).expect("Unable to write to file");
+        println!("Password updated for '{}'.", app_name);
+    } else {
+        println!("Application '{}' not found.", app_name);
+    }
+}
