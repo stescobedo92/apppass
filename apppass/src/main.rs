@@ -4,7 +4,7 @@ use clap::{Arg, ArgAction, Command};
 
 fn main() {
     let apppass = Command::new("apppass")
-        .version("1.1")
+        .version("1.2")
         .author("Sergio Triana Escobedo")
         .about("Generate secure passwords for your applications.")
         .arg(
