@@ -32,11 +32,12 @@ fn fill_data() {
 /// # Arguments
 ///
 /// * `app_name` - A string slice that holds the name of the application.
-pub fn generate_save_safety_password(app_name: &str) {
+pub fn generate_save_safety_password(app_name: &str, length: Option<usize>) {
+    let length = length.unwrap_or(30); // Longitud predeterminada: 30 caracteres
 
     let rand_password: String = thread_rng()
         .sample_iter(&Alphanumeric)
-        .take(30)
+        .take(length)
         .map(char::from)
         .collect();
 
@@ -50,8 +51,6 @@ pub fn generate_save_safety_password(app_name: &str) {
     if let Err(e) = writeln!(file, "{},{}", app_name, rand_password) {
         eprintln!("Couldn't write to file: {}", e);
     }
-
-    fill_data();
 
     println!("Password generated and saved for the application: {}", app_name);
 }
