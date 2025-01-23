@@ -1,0 +1,21 @@
+name: Sync from Azure DevOps
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code from GitHub
+        uses: actions/checkout@v3
+
+      - name: Add Azure DevOps remote
+        run: |
+          git remote add azure-devops https://BinaryCoffee@dev.azure.com/BinaryCoffee/apppass/_git/apppass
+          git fetch azure-devops
+          git merge azure-devops/main
+          git push origin main
