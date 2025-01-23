@@ -1,83 +1,106 @@
-//! # Module Documentation
-//!
-//! This module provides functionalities for password management, including storage, generation,
-//! listing, retrieval, deletion, updating, exporting, importing, and generating one-time passwords (OTPs).
-//!
-//! ## Functions
-//!
-//! - **fill_data()**
-//!   - Fills internal application data (`APPLICATION_DATA`) from a file specified by `FILE_NAME`.
-//!   - Reads each line, splits by comma, and populates the in-memory hash map for quick lookups.
-//!
-//! - **generate_save_safety_password(app_name: &str, length: Option<usize>)**
-//!   - Generates a random password (default length 30) using alphanumeric characters.
-//!   - Saves the application name and generated password to the file and updates in-memory data accordingly.
-//!
-//! - **show_list_applications()**
-//!   - Displays all stored application-password pairs by reading from and printing the in-memory hash map.
-//!
-//! - **get_password_for_specify_app(app_name: &str)**
-//!   - Retrieves the password for a specified application from the in-memory data.
-//!   - Prints the password if found, otherwise informs that the application doesn't exist.
-//!
-//! - **delete_password(app_name: &str)**
-//!   - Removes the specified application-password pair from both in-memory data and the file.
-//!   - Rewrites the file with updated content after removal.
-//!
-//! - **update_password(app_name: &str, new_password: &str)**
-//!   - Updates the password for a specified application in in-memory data and the file.
-//!   - Rewrites the file with new content after updating.
-//!
-//! - **export_passwords(file_path: &str)**
-//!   - Exports all application-password pairs from in-memory data to the specified file.
-//!
-//! - **import_passwords(file_path: &str)**
-//!   - Imports application-password pairs from a file and merges them into in-memory data.
-//!   - Saves the resulting data back to the main storage file.
-//!
-//! - **generate_otp(app_name: &str, ttl_seconds: u64)**
-//!   - Generates and prints a random one-time password (OTP) associated with the specified application.
-//!   - Displays the expiration time based on `ttl_seconds`.
-use std::fs::*;
-use std::io::*;
-use rand::{thread_rng, Rng};
-use rand::seq::SliceRandom;
+use keyring::{Entry, Error as KeyringError};
+use std::collections::{HashMap, HashSet};
+use std::sync::Mutex;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use rand::{thread_rng, Rng, seq::SliceRandom};
 use rand::distributions::Alphanumeric;
 use std::time::{SystemTime, UNIX_EPOCH, Duration};
 use std::thread;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-const FILE_NAME: &str = "passwords";
+static APP_INDEX: &str = "apppass_index";
+static APP_SERVICE: &str = "apppass";
+static APPLICATION_DATA: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 
-static APPLICATION_DATA: Lazy<std::sync::Mutex<HashMap<String, String>>> = Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
+fn save_to_keyring(app_name: &str, password: &str) -> Result<(), KeyringError> {
+    let entry = Entry::new(APP_SERVICE, app_name)?;
+    entry.set_password(password)?;
+    update_index(app_name, true)?;
+    Ok(())
+}
 
-/// Fills the `APPLICATION_DATA` with data from the file specified by `FILE_NAME`.
-fn fill_data() {
-    let mut application_data = APPLICATION_DATA.lock().unwrap();
-    let file = File::open(FILE_NAME).expect("Could not open the file");
+fn get_from_keyring(app_name: &str) -> Result<String, KeyringError> {
+    let entry = Entry::new(APP_SERVICE, app_name)?;
+    entry.get_password()
+}
 
-    let reader: BufReader<File> = BufReader::new(file);
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            let key_value: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
-            if key_value.len() == 2 {
-                let app_name = key_value[0].to_string();
-                let password = key_value[1].to_string();
-                application_data.insert(app_name, password);
-            }
+
+fn delete_from_keyring(app_name: &str) -> Result<(), KeyringError> {
+    let entry = Entry::new(APP_SERVICE, app_name)?;
+    entry.delete_credential()?;
+    update_index(app_name, false)?;
+    Ok(())
+}
+
+pub fn get_password_for_specify_app(app_name: &str) {
+    match get_from_keyring(app_name) {
+        Ok(password) => {
+            println!("Application Name: {}", app_name);
+            println!("Password: {}", password);
+        }
+        Err(KeyringError::NoEntry) => {
+            println!("No password found for '{}'.", app_name);
+        }
+        Err(e) => {
+            eprintln!("Failed to retrieve password for '{}': {}", app_name, e);
         }
     }
 }
 
-/// Generates a random password, saves it to the file, and updates the application data.
-///
-/// # Arguments
-///
-/// * `app_name` - A string slice that holds the name of the application.
+pub fn update_password(app_name: &str, new_password: &str) {
+    match save_to_keyring(app_name, new_password) {
+        Ok(_) => println!("Password updated successfully for '{}'.", app_name),
+        Err(e) => eprintln!("Failed to update password for '{}': {}", app_name, e),
+    }
+}
+
+fn update_index(app_name: &str, add: bool) -> Result<(), KeyringError> {
+    let entry = Entry::new(APP_SERVICE, APP_INDEX)?;
+    let mut index: HashSet<String> = match entry.get_password() {
+        Ok(data) => data.split(',').map(String::from).collect(),
+        Err(KeyringError::NoEntry) => HashSet::new(),
+        Err(e) => return Err(e),
+    };
+
+    if add {
+        index.insert(app_name.to_string());
+    } else {
+        index.remove(app_name);
+    }
+
+    let updated_index = index.into_iter().collect::<Vec<_>>().join(",");
+    entry.set_password(&updated_index)
+}
+
+/// Lista todas las aplicaciones almacenadas
+pub fn show_list_applications() {
+    let entry = Entry::new(APP_SERVICE, APP_INDEX);
+    match entry {
+        Ok(index_entry) => match index_entry.get_password() {
+            Ok(data) => {
+                let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
+                for app_name in app_names {
+                    match get_from_keyring(app_name) {
+                        Ok(password) => {
+                            println!("Application Name: {}", app_name);
+                            println!("Password: {}", password);
+                            println!();
+                        }
+                        Err(e) => eprintln!("Failed to retrieve password for '{}': {}", app_name, e),
+                    }
+                }
+            }
+            Err(KeyringError::NoEntry) => {
+                println!("No applications stored.");
+            }
+            Err(e) => eprintln!("Failed to retrieve index: {}", e),
+        },
+        Err(e) => eprintln!("Failed to access index: {}", e),
+    }
+}
+
 pub fn generate_save_safety_password(app_name: &str, length: Option<usize>) {
-    let length = length.unwrap_or(30); // Longitud predeterminada: 30 caracteres
+    let length = length.unwrap_or(30);
 
     let rand_password: String = thread_rng()
         .sample_iter(&Alphanumeric)
@@ -85,155 +108,54 @@ pub fn generate_save_safety_password(app_name: &str, length: Option<usize>) {
         .map(char::from)
         .collect();
 
-    let mut file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .append(true)
-        .open(FILE_NAME)
-        .unwrap();
-
-    if let Err(e) = writeln!(file, "{},{}", app_name, rand_password) {
-        eprintln!("Couldn't write to file: {}", e);
-    }
-
-    println!("Password generated and saved for the application: {}", app_name);
-}
-
-/// Shows a list of all applications and their passwords.
-pub fn show_list_applications() {
-    fill_data();
-    let application_data = APPLICATION_DATA.lock().unwrap();
-
-    for (key, value) in application_data.iter() {
-        print!("Application_Name: {}\n", key);
-        print!("Password: {}\n", value);
-        println!();
+    match save_to_keyring(app_name, &rand_password) {
+        Ok(_) => println!("Password saved securely for '{}'.", app_name),
+        Err(e) => eprintln!("Failed to save password for '{}': {}", app_name, e),
     }
 }
 
-/// Retrieves the password for a specified application.
-///
-/// # Arguments
-///
-/// * `app_name` - A string slice that holds the name of the application.
-pub fn get_password_for_specify_app(app_name: &str) {
-    fill_data();
-    let application_data = APPLICATION_DATA.lock().unwrap();
+pub fn delete_password(app_name: &str) {
+    match delete_from_keyring(app_name) {
+        Ok(_) => println!("Password for '{}' deleted successfully.", app_name),
+        Err(KeyringError::NoEntry) => println!("No password found for '{}'.", app_name),
+        Err(e) => eprintln!("Failed to delete password for '{}': {}", app_name, e),
+    }
+}
 
-    let to_find = [app_name];
-    for &name_app in &to_find {
-        match application_data.get(name_app) {
-            Some(password) => {
-                print!("Application_Name: {}\n", name_app);
-                print!("Password: {}\n", password);
-                println!();
-            },
-            None => println!("{name_app} don't exists.")
+pub fn export_passwords(file_path: &str) {
+    let application_data = APPLICATION_DATA.lock().unwrap();
+    let mut content = String::new();
+
+    for app_name in application_data.iter() {
+        if let Ok(password) = get_from_keyring(app_name) {
+            content.push_str(&format!("{},{}\n", app_name, password));
         }
     }
-}
 
-/// Deletes the password for a specified application.
-///
-/// # Arguments
-///
-/// * `app_name` - A string slice that holds the name of the application.
-pub fn delete_password(app_name: &str) {
-    fill_data();
-    let mut application_data = APPLICATION_DATA.lock().unwrap();
-
-    if application_data.remove(app_name).is_some() {
-        let new_content: String = application_data
-            .iter()
-            .map(|(app, pass)| format!("{},{}", app, pass))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        std::fs::write(FILE_NAME, new_content).expect("Unable to write to file");
-        println!("Application '{}' deleted successfully.", app_name);
+    if std::fs::write(file_path, content).is_ok() {
+        println!("Passwords exported to '{}'.", file_path);
     } else {
-        println!("Application '{}' not found.", app_name);
+        eprintln!("Failed to export passwords to '{}'.", file_path);
     }
 }
 
-/// Updates the password for a specified application.
-///
-/// # Arguments
-///
-/// * `app_name` - A string slice that holds the name of the application.
-/// * `new_password` - A string slice that holds the new password for the application.
-pub fn update_password(app_name: &str, new_password: &str) {
-    fill_data();
-    let mut application_data = APPLICATION_DATA.lock().unwrap();
-
-    if application_data.contains_key(app_name) {
-        application_data.insert(app_name.to_string(), new_password.to_string());
-
-        let new_content: String = application_data
-            .iter()
-            .map(|(app, pass)| format!("{},{}", app, pass))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        std::fs::write(FILE_NAME, new_content).expect("Unable to write to file");
-        println!("Password updated for '{}'.", app_name);
-    } else {
-        println!("Application '{}' not found.", app_name);
-    }
-}
-
-/// Exports all stored passwords to a specified file.
-///
-/// # Arguments
-///
-/// * `file_path` - A string slice that holds the path to the file where passwords will be exported.
-pub fn export_passwords(file_path: &str) {
-    fill_data();
-    let application_data = APPLICATION_DATA.lock().unwrap();
-
-    let mut file = File::create(file_path).expect("Failed to create export file");
-
-    for (app, pass) in application_data.iter() {
-        writeln!(file, "{},{}", app, pass).expect("Failed to write to export file");
-    }
-
-    println!("Passwords exported to '{}'.", file_path);
-}
-
-/// Imports passwords from a specified file.
-///
-/// # Arguments
-///
-/// * `file_path` - A string slice that holds the path to the file to import passwords from.
 pub fn import_passwords(file_path: &str) {
-    let file = File::open(file_path).expect("Failed to open import file");
-    let reader = BufReader::new(file);
-
-    let mut application_data = APPLICATION_DATA.lock().unwrap();
-
-    for line in reader.lines() {
-        if let Ok(line) = line {
+    if let Ok(content) = std::fs::read_to_string(file_path) {
+        let lines = content.lines();
+        for line in lines {
             let key_value: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
             if key_value.len() == 2 {
-                let app_name = key_value[0].to_string();
-                let password = key_value[1].to_string();
-                application_data.insert(app_name, password);
+                let app_name = key_value[0];
+                let password = key_value[1];
+                let _ = save_to_keyring(app_name, password);
             }
         }
+        println!("Passwords imported from '{}'.", file_path);
+    } else {
+        eprintln!("Failed to import passwords from '{}'.", file_path);
     }
-
-    let new_content: String = application_data
-        .iter()
-        .map(|(app, pass)| format!("{},{}", app, pass))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    std::fs::write(FILE_NAME, new_content).expect("Unable to write to file");
-
-    println!("Passwords imported from '{}'.", file_path);
 }
 
-/// Generates a random one-time password (OTP) and prints it along with the expiration time.
 pub fn generate_otp(app_name: &str, ttl_seconds: u64) {
     let expiration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -250,9 +172,8 @@ pub fn generate_otp(app_name: &str, ttl_seconds: u64) {
     println!("Expires at: {:?}", expiration);
 }
 
-/// Generates a memorizable password for a specified application.
 pub fn generate_memorizable_password(app_name: &str) {
-    let words = vec!["Tiger", "Orange", "Mountain", "River", "Cloud"];
+    let words = vec!["Tiger", "Orange", "Mountain", "River", "Cloud", "Sky", "Sun", "Moon"];
     let mut rng = thread_rng();
 
     let password = format!(
@@ -262,10 +183,12 @@ pub fn generate_memorizable_password(app_name: &str) {
         words.choose(&mut rng).unwrap()
     );
 
-    println!("Memorizable Password for '{}': {}", app_name, password);
+    match save_to_keyring(app_name, &password) {
+        Ok(_) => println!("Memorizable Password saved for '{}'.", app_name),
+        Err(e) => eprintln!("Failed to save memorizable password for '{}': {}", app_name, e),
+    }
 }
 
-/// Starts a thread that locks the application after a specified timeout.
 pub fn start_auto_lock(timeout_seconds: u64) {
     let is_active = Arc::new(Mutex::new(true));
     let is_active_clone = Arc::clone(&is_active);
