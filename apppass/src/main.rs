@@ -10,7 +10,7 @@ use crate::app::password::{delete_password, export_passwords, generate_memorizab
 
 fn main() {
     let apppass = Command::new("apppass")
-        .version("1.3")
+        .version(env!("CARGO_PKG_VERSION"))
         .author("Sergio Triana Escobedo")
         .about("Generate secure passwords for your applications.")
         .arg(
@@ -129,7 +129,7 @@ fn main() {
         let ttl = apppass
             .get_one::<String>("ttl")
             .and_then(|t| t.parse::<u64>().ok())
-            .unwrap_or(300); // TTL predeterminado de 300 segundos
+            .unwrap_or(300);
         generate_otp(name, ttl);
     }
 
@@ -138,7 +138,7 @@ fn main() {
     }
 
     if let Some(lock_time) = apppass.get_one::<String>("lock") {
-        let timeout = lock_time.parse::<u64>().unwrap_or(60); // Timeout predeterminado de 60 segundos
+        let timeout = lock_time.parse::<u64>().unwrap_or(60);
         start_auto_lock(timeout);
     }
 }
