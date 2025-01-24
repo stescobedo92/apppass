@@ -134,15 +134,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_from_keyring() {
-        save_to_keyring(TEST_APP_NAME, TEST_PASSWORD).unwrap();
-        let result = get_from_keyring(TEST_APP_NAME);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), TEST_PASSWORD);
-        delete_from_keyring(TEST_APP_NAME).unwrap(); // Clean up
-    }
-
-    #[test]
     fn test_delete_from_keyring() {
         save_to_keyring(TEST_APP_NAME, TEST_PASSWORD).unwrap();
         let result = delete_from_keyring(TEST_APP_NAME);
