@@ -25,3 +25,21 @@ pub fn generate_otp(_app_name: &str, ttl_seconds: u64) {
     println!("Temporary Password: {}", otp);
     println!("Expires at: {:?}", expiration);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_otp() {
+        let ttl_seconds = 5;
+        let start_time = SystemTime::now();
+        generate_otp("TestApp", ttl_seconds);
+        let end_time = SystemTime::now();
+        let expiration = start_time + Duration::new(ttl_seconds, 0);
+
+        // Allow some margin for the test execution time
+        assert!(end_time.duration_since(start_time).unwrap().as_secs() < ttl_seconds + 1);
+        assert_eq!(expiration.duration_since(start_time).unwrap().as_secs(), ttl_seconds);
+    }
+}
