@@ -4,6 +4,16 @@ use keyring::{Entry, Error as KeyringError};
 use std::collections::{HashSet};
 use crate::app::{APP_INDEX, APP_SERVICE};
 
+/// Saves the given password to the keyring for the specified application.
+///
+/// # Arguments
+///
+/// * `app_name` - The name of the application.
+/// * `password` - The password to save.
+///
+/// # Returns
+///
+/// * `Result<(), KeyringError>` - Returns `Ok(())` if the password is saved successfully, otherwise returns a `KeyringError`.
 pub fn save_to_keyring(app_name: &str, password: &str) -> Result<(), KeyringError> {
     let entry = Entry::new(APP_SERVICE, app_name)?;
     entry.set_password(password)?;
@@ -11,12 +21,29 @@ pub fn save_to_keyring(app_name: &str, password: &str) -> Result<(), KeyringErro
     Ok(())
 }
 
+/// Retrieves the password from the keyring for the specified application.
+///
+/// # Arguments
+///
+/// * `app_name` - The name of the application.
+///
+/// # Returns
+///
+/// * `Result<String, KeyringError>` - Returns the password as a `String` if found, otherwise returns a `KeyringError`.
 pub fn get_from_keyring(app_name: &str) -> Result<String, KeyringError> {
     let entry = Entry::new(APP_SERVICE, app_name)?;
     entry.get_password()
 }
 
-
+/// Deletes the password from the keyring for the specified application.
+///
+/// # Arguments
+///
+/// * `app_name` - The name of the application.
+///
+/// # Returns
+///
+/// * `Result<(), KeyringError>` - Returns `Ok(())` if the password is deleted successfully, otherwise returns a `KeyringError`.
 pub fn delete_from_keyring(app_name: &str) -> Result<(), KeyringError> {
     let entry = Entry::new(APP_SERVICE, app_name)?;
     entry.delete_credential()?;
@@ -24,6 +51,20 @@ pub fn delete_from_keyring(app_name: &str) -> Result<(), KeyringError> {
     Ok(())
 }
 
+/// Updates the index of applications in the keyring.
+///
+/// This function retrieves the current index of applications from the keyring,
+/// modifies it by adding or removing the specified application name, and then
+/// saves the updated index back to the keyring.
+///
+/// # Arguments
+///
+/// * `app_name` - The name of the application to add or remove from the index.
+/// * `add` - A boolean indicating whether to add (`true`) or remove (`false`) the application name.
+///
+/// # Returns
+///
+/// * `Result<(), KeyringError>` - Returns `Ok(())` if the index is updated successfully, otherwise returns a `KeyringError`.
 fn update_index(app_name: &str, add: bool) -> Result<(), KeyringError> {
     let entry = Entry::new(APP_SERVICE, APP_INDEX)?;
     let mut index: HashSet<String> = match entry.get_password() {
@@ -42,6 +83,16 @@ fn update_index(app_name: &str, add: bool) -> Result<(), KeyringError> {
     entry.set_password(&updated_index)
 }
 
+/// Lists all applications stored in the keyring along with their passwords.
+///
+/// This function retrieves the index of applications from the keyring and
+/// iterates through each application name to fetch and print the associated
+/// password.
+///
+/// # Panics
+///
+/// This function will panic if it fails to access the keyring or retrieve
+/// the index of applications.
 pub fn show_list_applications() {
     let entry = Entry::new(APP_SERVICE, APP_INDEX);
     match entry {
