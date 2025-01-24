@@ -2,6 +2,11 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+/// Starts an auto-lock mechanism that locks the application after a specified timeout.
+///
+/// # Arguments
+///
+/// * `timeout_seconds` - The number of seconds to wait before locking the application.
 pub fn start_auto_lock(timeout_seconds: u64) {
     let is_active = Arc::new(Mutex::new(true));
     let is_active_clone = Arc::clone(&is_active);

@@ -6,6 +6,11 @@ use rand::prelude::SliceRandom;
 use crate::app::keyring::{get_from_keyring, save_to_keyring, delete_from_keyring};
 use crate::app::APPLICATION_DATA;
 
+/// Retrieves the password for the specified application from the keyring.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application for which the password is retrieved.
 pub fn get_password_for_specify_app(app_name: &str) {
     match get_from_keyring(app_name) {
         Ok(password) => {
@@ -21,6 +26,12 @@ pub fn get_password_for_specify_app(app_name: &str) {
     }
 }
 
+/// Updates the password for the specified application in the keyring.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application for which the password is updated.
+/// * `new_password` - A string slice that holds the new password to be saved.
 pub fn update_password(app_name: &str, new_password: &str) {
     match save_to_keyring(app_name, new_password) {
         Ok(_) => println!("Password updated successfully for '{}'.", app_name),
@@ -28,6 +39,14 @@ pub fn update_password(app_name: &str, new_password: &str) {
     }
 }
 
+/// Generates a random password for the specified application and saves it to the keyring.
+///
+/// The password is composed of alphanumeric characters and has a default length of 30 characters if not specified.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application for which the password is generated.
+/// * `length` - An optional length for the generated password.
 pub fn generate_save_safety_password(app_name: &str, length: Option<usize>) {
     let length = length.unwrap_or(30);
 
@@ -43,6 +62,11 @@ pub fn generate_save_safety_password(app_name: &str, length: Option<usize>) {
     }
 }
 
+/// Deletes the password for the specified application from the keyring.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application for which the password is deleted.
 pub fn delete_password(app_name: &str) {
     match delete_from_keyring(app_name) {
         Ok(_) => println!("Password for '{}' deleted successfully.", app_name),
@@ -51,6 +75,13 @@ pub fn delete_password(app_name: &str) {
     }
 }
 
+/// Exports all stored passwords to a specified file.
+///
+/// The passwords are retrieved from the keyring and written to the file in the format `app_name,password`.
+///
+/// # Arguments
+///
+/// * `file_path` - A string slice that holds the path to the file where passwords will be exported.
 pub fn export_passwords(file_path: &str) {
     let application_data = APPLICATION_DATA.lock().unwrap();
     let mut content = String::new();
@@ -68,6 +99,13 @@ pub fn export_passwords(file_path: &str) {
     }
 }
 
+/// Imports passwords from a specified file and saves them to the keyring.
+///
+/// The file should contain lines in the format `app_name,password`.
+///
+/// # Arguments
+///
+/// * `file_path` - A string slice that holds the path to the file from which passwords are imported.
 pub fn import_passwords(file_path: &str) {
     if let Ok(content) = std::fs::read_to_string(file_path) {
         let lines = content.lines();
@@ -85,6 +123,13 @@ pub fn import_passwords(file_path: &str) {
     }
 }
 
+/// Generates a memorizable password for the specified application and saves it to the keyring.
+///
+/// The password is composed of two random words from a predefined list and a random number between 10 and 99.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application for which the password is generated.
 pub fn generate_memorizable_password(app_name: &str) {
     let words = vec!["Tiger", "Orange", "Mountain", "River", "Cloud", "Sky", "Sun", "Moon"];
     let mut rng = thread_rng();
