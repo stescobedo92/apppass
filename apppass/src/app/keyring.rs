@@ -118,3 +118,50 @@ pub fn show_list_applications() {
         Err(e) => eprintln!("Failed to access index: {}", e),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use keyring::Entry;
+
+    const TEST_APP_NAME: &str = "test_app";
+    const TEST_PASSWORD: &str = "test_password";
+
+    #[test]
+    fn test_save_to_keyring() {
+        let result = save_to_keyring(TEST_APP_NAME, TEST_PASSWORD);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_get_from_keyring() {
+        save_to_keyring(TEST_APP_NAME, TEST_PASSWORD).unwrap();
+        let result = get_from_keyring(TEST_APP_NAME);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), TEST_PASSWORD);
+        delete_from_keyring(TEST_APP_NAME).unwrap(); // Clean up
+    }
+
+    #[test]
+    fn test_delete_from_keyring() {
+        save_to_keyring(TEST_APP_NAME, TEST_PASSWORD).unwrap();
+        let result = delete_from_keyring(TEST_APP_NAME);
+        assert!(result.is_ok());
+        let result = get_from_keyring(TEST_APP_NAME);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_update_index() {
+        let result = update_index(TEST_APP_NAME, true);
+        assert!(result.is_ok());
+        let entry = Entry::new(APP_SERVICE, APP_INDEX).unwrap();
+        let index = entry.get_password().unwrap();
+        assert!(index.contains(TEST_APP_NAME));
+
+        let result = update_index(TEST_APP_NAME, false);
+        assert!(result.is_ok());
+        let index = entry.get_password().unwrap();
+        assert!(!index.contains(TEST_APP_NAME));
+    }
+}
