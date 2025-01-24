@@ -1,6 +1,12 @@
-mod functionalities;
+mod app;
 
 use clap::{Arg, ArgAction, Command};
+use crate::app::keyring::show_list_applications;
+use crate::app::lock::start_auto_lock;
+use crate::app::otp::generate_otp;
+use crate::app::password::{delete_password, export_passwords, generate_memorizable_password,
+                           generate_save_safety_password, get_password_for_specify_app,
+                           import_passwords, update_password};
 
 fn main() {
     let apppass = Command::new("apppass")
@@ -91,32 +97,32 @@ fn main() {
         let length = apppass
             .get_one::<String>("length")
             .and_then(|l| l.parse::<usize>().ok());
-        functionalities::generate_save_safety_password(name, length);
+        generate_save_safety_password(name, length);
     }
 
     if *apppass.get_one::<bool>("list").unwrap_or(&false) {
-        functionalities::show_list_applications();
+        show_list_applications();
     }
 
     if let Some(name) = apppass.get_one::<String>("get") {
-        functionalities::get_password_for_specify_app(name);
+        get_password_for_specify_app(name);
     }
 
     if let Some(name) = apppass.get_one::<String>("delete") {
-        functionalities::delete_password(name);
+        delete_password(name);
     }
 
     if let Some(name) = apppass.get_one::<String>("update") {
         let new_pass = "new_secure_password";
-        functionalities::update_password(name, new_pass);
+        update_password(name, new_pass);
     }
 
     if let Some(path) = apppass.get_one::<String>("export") {
-        functionalities::export_passwords(path);
+        export_passwords(path);
     }
 
     if let Some(path) = apppass.get_one::<String>("import") {
-        functionalities::import_passwords(path);
+        import_passwords(path);
     }
 
     if let Some(name) = apppass.get_one::<String>("otp") {
@@ -124,16 +130,16 @@ fn main() {
             .get_one::<String>("ttl")
             .and_then(|t| t.parse::<u64>().ok())
             .unwrap_or(300); // TTL predeterminado de 300 segundos
-        functionalities::generate_otp(name, ttl);
+        generate_otp(name, ttl);
     }
 
     if let Some(name) = apppass.get_one::<String>("memorizable") {
-        functionalities::generate_memorizable_password(name);
+        generate_memorizable_password(name);
     }
 
     if let Some(lock_time) = apppass.get_one::<String>("lock") {
         let timeout = lock_time.parse::<u64>().unwrap_or(60); // Timeout predeterminado de 60 segundos
-        functionalities::start_auto_lock(timeout);
+        start_auto_lock(timeout);
     }
 }
 
