@@ -1,4 +1,5 @@
 mod app;
+mod ui;
 
 use clap::{Arg, ArgAction, Command};
 use crate::app::keyring::show_list_applications;
@@ -91,7 +92,22 @@ fn main() {
                 .action(ArgAction::Set)
                 .help("Set auto-lock timeout in seconds"),
         )
+        .arg(
+            Arg::new("ui")
+                .long("ui")
+                .action(ArgAction::SetTrue)
+                .help("Launch interactive UI mode"),
+        )
         .get_matches();
+
+    // If UI flag is set, launch the interactive TUI
+    if *apppass.get_one::<bool>("ui").unwrap_or(&false) {
+        if let Err(e) = ui::run_tui() {
+            eprintln!("Error running UI: {}", e);
+            std::process::exit(1);
+        }
+        return;
+    }
 
     if let Some(name) = apppass.get_one::<String>("app") {
         let length = apppass
