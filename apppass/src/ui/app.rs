@@ -8,8 +8,10 @@ use std::io;
 pub enum Mode {
     /// Main menu
     Menu,
-    /// Create new password
+    /// Create new password (auto-generated)
     Create,
+    /// Create custom password (user-specified)
+    CreateCustom,
     /// List all passwords
     List,
     /// Update password
@@ -18,6 +20,14 @@ pub enum Mode {
     Delete,
     /// View single password
     View,
+    /// Generate OTP
+    GenerateOTP,
+    /// Generate memorizable password
+    Memorizable,
+    /// Export passwords
+    Export,
+    /// Import passwords
+    Import,
 }
 
 /// Input field for forms
@@ -118,10 +128,15 @@ impl App {
         match self.mode {
             Mode::Menu => self.handle_menu_key(key),
             Mode::Create => self.handle_create_key(key),
+            Mode::CreateCustom => self.handle_create_custom_key(key),
             Mode::List => self.handle_list_key(key),
             Mode::Update => self.handle_update_key(key),
             Mode::Delete => self.handle_delete_key(key),
             Mode::View => self.handle_view_key(key),
+            Mode::GenerateOTP => self.handle_generate_otp_key(key),
+            Mode::Memorizable => self.handle_memorizable_key(key),
+            Mode::Export => self.handle_export_key(key),
+            Mode::Import => self.handle_import_key(key),
         }
     }
 
@@ -137,7 +152,7 @@ impl App {
                 }
             }
             KeyCode::Down => {
-                if self.selected_menu < 4 {
+                if self.selected_menu < 10 {  // Updated for 11 menu items (0-10)
                     self.selected_menu += 1;
                 }
             }
@@ -145,27 +160,66 @@ impl App {
                 self.status_message.clear();
                 match self.selected_menu {
                     0 => {
+                        // Create New Password (auto-generated)
                         self.mode = Mode::Create;
                         self.app_name_input.clear();
-                        self.password_input.clear();
                         self.length_input.clear();
                         self.active_input = 0;
                     }
                     1 => {
+                        // Create Custom Password
+                        self.mode = Mode::CreateCustom;
+                        self.app_name_input.clear();
+                        self.password_input.clear();
+                        self.active_input = 0;
+                    }
+                    2 => {
+                        // List All Passwords
                         self.mode = Mode::List;
                         self.load_passwords();
                     }
-                    2 => {
+                    3 => {
+                        // Update Password
                         self.mode = Mode::Update;
                         self.app_name_input.clear();
                         self.password_input.clear();
                         self.active_input = 0;
                     }
-                    3 => {
+                    4 => {
+                        // Delete Password
                         self.mode = Mode::Delete;
                         self.app_name_input.clear();
                     }
-                    4 => {
+                    5 => {
+                        // Generate OTP
+                        self.mode = Mode::GenerateOTP;
+                        self.app_name_input.clear();
+                        self.length_input.clear();  // Use for TTL
+                        self.active_input = 0;
+                    }
+                    6 => {
+                        // Generate Memorizable Password
+                        self.mode = Mode::Memorizable;
+                        self.app_name_input.clear();
+                    }
+                    7 => {
+                        // Export Passwords
+                        self.mode = Mode::Export;
+                        self.app_name_input.clear();  // Use for file path
+                    }
+                    8 => {
+                        // Import Passwords
+                        self.mode = Mode::Import;
+                        self.app_name_input.clear();  // Use for file path
+                    }
+                    9 => {
+                        // Set Auto-Lock
+                        self.mode = Mode::Update;  // Reuse update for now, or create new mode
+                        self.status_message = "Auto-lock not implemented in UI yet".to_string();
+                        self.mode = Mode::Menu;
+                    }
+                    10 => {
+                        // Exit
                         self.should_quit = true;
                     }
                     _ => {}
@@ -176,8 +230,51 @@ impl App {
         Ok(())
     }
 
-    /// Handles keys in create mode
+    /// Handles keys in create mode (auto-generate password)
     fn handle_create_key(&mut self, key: KeyEvent) -> io::Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Menu;
+            }
+            KeyCode::Enter => {
+                if !self.app_name_input.value.is_empty() {
+                    // Auto-generate password with default length (30)
+                    match crate::app::password::generate_save_safety_password(
+                        &self.app_name_input.value,
+                        None,  // Use default length
+                    ) {
+                        Ok(_) => {
+                            self.status_message = format!(
+                                "✓ Password auto-generated for '{}'",
+                                self.app_name_input.value
+                            );
+                            self.app_name_input.clear();
+                        }
+                        Err(e) => {
+                            self.status_message = format!("✗ Error: {}", e);
+                        }
+                    }
+                }
+            }
+            KeyCode::Char(c) => {
+                self.app_name_input.insert_char(c);
+            }
+            KeyCode::Backspace => {
+                self.app_name_input.delete_char();
+            }
+            KeyCode::Left => {
+                self.app_name_input.move_cursor_left();
+            }
+            KeyCode::Right => {
+                self.app_name_input.move_cursor_right();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handles keys in create custom mode (user-specified password)
+    fn handle_create_custom_key(&mut self, key: KeyEvent) -> io::Result<()> {
         match key.code {
             KeyCode::Esc => {
                 self.mode = Mode::Menu;
@@ -186,28 +283,19 @@ impl App {
                 self.active_input = (self.active_input + 1) % 2;
             }
             KeyCode::Enter => {
-                if !self.app_name_input.value.is_empty() {
-                    let length = if !self.length_input.value.is_empty() {
-                        match self.length_input.value.parse::<usize>() {
-                            Ok(len) => Some(len),
-                            Err(_) => {
-                                self.status_message = "✗ Invalid length value".to_string();
-                                return Ok(());
-                            }
-                        }
-                    } else {
-                        None
-                    };
-                    
-                    match crate::app::password::generate_save_safety_password(
+                if !self.app_name_input.value.is_empty() && !self.password_input.value.is_empty() {
+                    match save_to_keyring(
                         &self.app_name_input.value,
-                        length,
+                        &self.password_input.value,
                     ) {
                         Ok(_) => {
                             self.status_message = format!(
-                                "✓ Password created for '{}'",
+                                "✓ Custom password saved for '{}'",
                                 self.app_name_input.value
                             );
+                            self.app_name_input.clear();
+                            self.password_input.clear();
+                            self.active_input = 0;
                         }
                         Err(e) => {
                             self.status_message = format!("✗ Error: {}", e);
@@ -219,28 +307,28 @@ impl App {
                 if self.active_input == 0 {
                     self.app_name_input.insert_char(c);
                 } else {
-                    self.length_input.insert_char(c);
+                    self.password_input.insert_char(c);
                 }
             }
             KeyCode::Backspace => {
                 if self.active_input == 0 {
                     self.app_name_input.delete_char();
                 } else {
-                    self.length_input.delete_char();
+                    self.password_input.delete_char();
                 }
             }
             KeyCode::Left => {
                 if self.active_input == 0 {
                     self.app_name_input.move_cursor_left();
                 } else {
-                    self.length_input.move_cursor_left();
+                    self.password_input.move_cursor_left();
                 }
             }
             KeyCode::Right => {
                 if self.active_input == 0 {
                     self.app_name_input.move_cursor_right();
                 } else {
-                    self.length_input.move_cursor_right();
+                    self.password_input.move_cursor_right();
                 }
             }
             _ => {}
@@ -394,6 +482,183 @@ impl App {
                         Ok(_) => {
                             self.status_message = format!(
                                 "✓ Password deleted for '{}'",
+                                self.app_name_input.value
+                            );
+                            self.app_name_input.clear();
+                        }
+                        Err(e) => {
+                            self.status_message = format!("✗ Error: {}", e);
+                        }
+                    }
+                }
+            }
+            KeyCode::Char(c) => {
+                self.app_name_input.insert_char(c);
+            }
+            KeyCode::Backspace => {
+                self.app_name_input.delete_char();
+            }
+            KeyCode::Left => {
+                self.app_name_input.move_cursor_left();
+            }
+            KeyCode::Right => {
+                self.app_name_input.move_cursor_right();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handles keys for OTP generation
+    fn handle_generate_otp_key(&mut self, key: KeyEvent) -> io::Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Menu;
+            }
+            KeyCode::Tab => {
+                self.active_input = (self.active_input + 1) % 2;
+            }
+            KeyCode::Enter => {
+                if !self.app_name_input.value.is_empty() {
+                    let ttl = if !self.length_input.value.is_empty() {
+                        self.length_input.value.parse::<u64>().unwrap_or(300)
+                    } else {
+                        300
+                    };
+                    
+                    crate::app::otp::generate_otp(&self.app_name_input.value, ttl);
+                    self.status_message = format!(
+                        "✓ OTP generated for '{}' (TTL: {}s)",
+                        self.app_name_input.value, ttl
+                    );
+                    self.app_name_input.clear();
+                    self.length_input.clear();
+                    self.active_input = 0;
+                }
+            }
+            KeyCode::Char(c) => {
+                if self.active_input == 0 {
+                    self.app_name_input.insert_char(c);
+                } else {
+                    self.length_input.insert_char(c);
+                }
+            }
+            KeyCode::Backspace => {
+                if self.active_input == 0 {
+                    self.app_name_input.delete_char();
+                } else {
+                    self.length_input.delete_char();
+                }
+            }
+            KeyCode::Left => {
+                if self.active_input == 0 {
+                    self.app_name_input.move_cursor_left();
+                } else {
+                    self.length_input.move_cursor_left();
+                }
+            }
+            KeyCode::Right => {
+                if self.active_input == 0 {
+                    self.app_name_input.move_cursor_right();
+                } else {
+                    self.length_input.move_cursor_right();
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handles keys for memorizable password generation
+    fn handle_memorizable_key(&mut self, key: KeyEvent) -> io::Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Menu;
+            }
+            KeyCode::Enter => {
+                if !self.app_name_input.value.is_empty() {
+                    match crate::app::password::generate_memorizable_password(&self.app_name_input.value) {
+                        Ok(_) => {
+                            self.status_message = format!(
+                                "✓ Memorizable password generated for '{}'",
+                                self.app_name_input.value
+                            );
+                            self.app_name_input.clear();
+                        }
+                        Err(e) => {
+                            self.status_message = format!("✗ Error: {}", e);
+                        }
+                    }
+                }
+            }
+            KeyCode::Char(c) => {
+                self.app_name_input.insert_char(c);
+            }
+            KeyCode::Backspace => {
+                self.app_name_input.delete_char();
+            }
+            KeyCode::Left => {
+                self.app_name_input.move_cursor_left();
+            }
+            KeyCode::Right => {
+                self.app_name_input.move_cursor_right();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handles keys for export passwords
+    fn handle_export_key(&mut self, key: KeyEvent) -> io::Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Menu;
+            }
+            KeyCode::Enter => {
+                if !self.app_name_input.value.is_empty() {
+                    match crate::app::password::export_passwords(&self.app_name_input.value) {
+                        Ok(_) => {
+                            self.status_message = format!(
+                                "✓ Passwords exported to '{}'",
+                                self.app_name_input.value
+                            );
+                            self.app_name_input.clear();
+                        }
+                        Err(e) => {
+                            self.status_message = format!("✗ Error: {}", e);
+                        }
+                    }
+                }
+            }
+            KeyCode::Char(c) => {
+                self.app_name_input.insert_char(c);
+            }
+            KeyCode::Backspace => {
+                self.app_name_input.delete_char();
+            }
+            KeyCode::Left => {
+                self.app_name_input.move_cursor_left();
+            }
+            KeyCode::Right => {
+                self.app_name_input.move_cursor_right();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handles keys for import passwords
+    fn handle_import_key(&mut self, key: KeyEvent) -> io::Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Menu;
+            }
+            KeyCode::Enter => {
+                if !self.app_name_input.value.is_empty() {
+                    match crate::app::password::import_passwords(&self.app_name_input.value) {
+                        Ok(_) => {
+                            self.status_message = format!(
+                                "✓ Passwords imported from '{}'",
                                 self.app_name_input.value
                             );
                             self.app_name_input.clear();

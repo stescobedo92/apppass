@@ -22,10 +22,15 @@ pub fn render(f: &mut Frame, app: &App) {
     match app.mode {
         Mode::Menu => render_menu(f, chunks[1], app),
         Mode::Create => render_create(f, chunks[1], app),
+        Mode::CreateCustom => render_create_custom(f, chunks[1], app),
         Mode::List => render_list(f, chunks[1], app),
         Mode::Update => render_update(f, chunks[1], app),
         Mode::Delete => render_delete(f, chunks[1], app),
         Mode::View => render_view(f, chunks[1], app),
+        Mode::GenerateOTP => render_generate_otp(f, chunks[1], app),
+        Mode::Memorizable => render_memorizable(f, chunks[1], app),
+        Mode::Export => render_export(f, chunks[1], app),
+        Mode::Import => render_import(f, chunks[1], app),
     }
 
     render_footer(f, chunks[2], app);
@@ -48,11 +53,16 @@ fn render_header(f: &mut Frame, area: Rect) {
 fn render_footer(f: &mut Frame, area: Rect, app: &App) {
     let help_text = match app.mode {
         Mode::Menu => "↑↓: Navigate | Enter: Select | q/Esc: Quit",
-        Mode::Create => "Tab: Switch Field | Enter: Create | Esc: Back",
+        Mode::Create => "Enter: Create | Esc: Back",
+        Mode::CreateCustom => "Tab: Switch Field | Enter: Create | Esc: Back",
         Mode::List => "↑↓: Navigate | Enter: View | r: Refresh | Esc: Back",
         Mode::View => "Enter/Esc: Back",
         Mode::Update => "Tab: Switch Field | Enter: Update | Esc: Back",
         Mode::Delete => "Enter: Delete | Esc: Back",
+        Mode::GenerateOTP => "Tab: Switch Field | Enter: Generate | Esc: Back",
+        Mode::Memorizable => "Enter: Generate | Esc: Back",
+        Mode::Export => "Enter: Export | Esc: Back",
+        Mode::Import => "Enter: Import | Esc: Back",
     };
 
     let footer = Paragraph::new(help_text)
@@ -65,10 +75,16 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
 /// Renders the main menu
 fn render_menu(f: &mut Frame, area: Rect, app: &App) {
     let menu_items = vec![
-        "Create New Password",
+        "Create New Password (Auto-generated)",
+        "Create Custom Password",
         "List All Passwords",
         "Update Password",
         "Delete Password",
+        "Generate OTP (One-Time Password)",
+        "Generate Memorizable Password",
+        "Export Passwords to CSV",
+        "Import Passwords from CSV",
+        "Set Auto-Lock",
         "Exit",
     ];
 
@@ -100,8 +116,56 @@ fn render_menu(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(menu, area);
 }
 
-/// Renders the create password form
+/// Renders the create password form (auto-generated)
 fn render_create(f: &mut Frame, area: Rect, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(0),
+        ])
+        .margin(2)
+        .split(area);
+
+    // App name input
+    let app_name_input = Paragraph::new(app.app_name_input.value.as_str())
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .block(
+            Block::default()
+                .title("Application Name")
+                .borders(Borders::ALL),
+        );
+    f.render_widget(app_name_input, chunks[0]);
+
+    // Info message
+    let info = Paragraph::new("Password will be auto-generated with 30 characters")
+        .style(Style::default().fg(Color::Gray))
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL).title("Info"));
+    f.render_widget(info, chunks[1]);
+
+    // Status message
+    if !app.status_message.is_empty() {
+        let status_color = if app.status_message.starts_with('✓') {
+            Color::Green
+        } else {
+            Color::Red
+        };
+        let status = Paragraph::new(app.status_message.as_str())
+            .style(Style::default().fg(status_color))
+            .block(Block::default().borders(Borders::ALL).title("Status"));
+        f.render_widget(status, chunks[2]);
+    }
+
+    // Set cursor position
+    let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
+    let cursor_y = chunks[0].y + 1;
+    f.set_cursor_position((cursor_x, cursor_y));
+}
+
+/// Renders the create custom password form
+fn render_create_custom(f: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -129,21 +193,21 @@ fn render_create(f: &mut Frame, area: Rect, app: &App) {
         );
     f.render_widget(app_name_input, chunks[0]);
 
-    // Length input
-    let length_style = if app.active_input == 1 {
+    // Password input
+    let password_style = if app.active_input == 1 {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
     
-    let length_input = Paragraph::new(app.length_input.value.as_str())
-        .style(length_style)
+    let password_input = Paragraph::new(app.password_input.value.as_str())
+        .style(password_style)
         .block(
             Block::default()
-                .title("Password Length (default: 30)")
+                .title("Custom Password (any length)")
                 .borders(Borders::ALL),
         );
-    f.render_widget(length_input, chunks[1]);
+    f.render_widget(password_input, chunks[1]);
 
     // Status message
     if !app.status_message.is_empty() {
@@ -346,6 +410,196 @@ fn render_delete(f: &mut Frame, area: Rect, app: &App) {
                 .borders(Borders::ALL),
         );
     f.render_widget(app_name_input, chunks[0]);
+
+    // Status message
+    if !app.status_message.is_empty() {
+        let status_color = if app.status_message.starts_with('✓') {
+            Color::Green
+        } else {
+            Color::Red
+        };
+        let status = Paragraph::new(app.status_message.as_str())
+            .style(Style::default().fg(status_color))
+            .block(Block::default().borders(Borders::ALL).title("Status"));
+        f.render_widget(status, chunks[1]);
+    }
+
+    // Set cursor position
+    let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
+    let cursor_y = chunks[0].y + 1;
+    f.set_cursor_position((cursor_x, cursor_y));
+}
+
+/// Renders the OTP generation form
+fn render_generate_otp(f: &mut Frame, area: Rect, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(0),
+        ])
+        .margin(2)
+        .split(area);
+
+    // App name input
+    let app_name_style = if app.active_input == 0 {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    
+    let app_name_input = Paragraph::new(app.app_name_input.value.as_str())
+        .style(app_name_style)
+        .block(
+            Block::default()
+                .title("Application Name")
+                .borders(Borders::ALL),
+        );
+    f.render_widget(app_name_input, chunks[0]);
+
+    // TTL input
+    let ttl_style = if app.active_input == 1 {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    
+    let ttl_input = Paragraph::new(app.length_input.value.as_str())
+        .style(ttl_style)
+        .block(
+            Block::default()
+                .title("TTL in seconds (default: 300)")
+                .borders(Borders::ALL),
+        );
+    f.render_widget(ttl_input, chunks[1]);
+
+    // Status message
+    if !app.status_message.is_empty() {
+        let status_color = if app.status_message.starts_with('✓') {
+            Color::Green
+        } else {
+            Color::Red
+        };
+        let status = Paragraph::new(app.status_message.as_str())
+            .style(Style::default().fg(status_color))
+            .block(Block::default().borders(Borders::ALL).title("Status"));
+        f.render_widget(status, chunks[2]);
+    }
+
+    // Set cursor position
+    if app.active_input == 0 {
+        let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
+        let cursor_y = chunks[0].y + 1;
+        f.set_cursor_position((cursor_x, cursor_y));
+    } else {
+        let cursor_x = chunks[1].x + (app.length_input.cursor_position as u16).min(chunks[1].width.saturating_sub(2)) + 1;
+        let cursor_y = chunks[1].y + 1;
+        f.set_cursor_position((cursor_x, cursor_y));
+    }
+}
+
+/// Renders the memorizable password generation form
+fn render_memorizable(f: &mut Frame, area: Rect, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(0),
+        ])
+        .margin(2)
+        .split(area);
+
+    let app_name_input = Paragraph::new(app.app_name_input.value.as_str())
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .block(
+            Block::default()
+                .title("Application Name")
+                .borders(Borders::ALL),
+        );
+    f.render_widget(app_name_input, chunks[0]);
+
+    // Status message
+    if !app.status_message.is_empty() {
+        let status_color = if app.status_message.starts_with('✓') {
+            Color::Green
+        } else {
+            Color::Red
+        };
+        let status = Paragraph::new(app.status_message.as_str())
+            .style(Style::default().fg(status_color))
+            .block(Block::default().borders(Borders::ALL).title("Status"));
+        f.render_widget(status, chunks[1]);
+    }
+
+    // Set cursor position
+    let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
+    let cursor_y = chunks[0].y + 1;
+    f.set_cursor_position((cursor_x, cursor_y));
+}
+
+/// Renders the export passwords form
+fn render_export(f: &mut Frame, area: Rect, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(0),
+        ])
+        .margin(2)
+        .split(area);
+
+    let file_path_input = Paragraph::new(app.app_name_input.value.as_str())
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .block(
+            Block::default()
+                .title("File Path (e.g., passwords.csv)")
+                .borders(Borders::ALL),
+        );
+    f.render_widget(file_path_input, chunks[0]);
+
+    // Status message
+    if !app.status_message.is_empty() {
+        let status_color = if app.status_message.starts_with('✓') {
+            Color::Green
+        } else {
+            Color::Red
+        };
+        let status = Paragraph::new(app.status_message.as_str())
+            .style(Style::default().fg(status_color))
+            .block(Block::default().borders(Borders::ALL).title("Status"));
+        f.render_widget(status, chunks[1]);
+    }
+
+    // Set cursor position
+    let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
+    let cursor_y = chunks[0].y + 1;
+    f.set_cursor_position((cursor_x, cursor_y));
+}
+
+/// Renders the import passwords form
+fn render_import(f: &mut Frame, area: Rect, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(0),
+        ])
+        .margin(2)
+        .split(area);
+
+    let file_path_input = Paragraph::new(app.app_name_input.value.as_str())
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .block(
+            Block::default()
+                .title("File Path (e.g., passwords.csv)")
+                .borders(Borders::ALL),
+        );
+    f.render_widget(file_path_input, chunks[0]);
 
     // Status message
     if !app.status_message.is_empty() {
