@@ -160,11 +160,11 @@ fn render_create(f: &mut Frame, area: Rect, app: &App) {
 
     // Set cursor position
     if app.active_input == 0 {
-        let cursor_x = chunks[0].x + app.app_name_input.cursor_position as u16 + 1;
+        let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
         let cursor_y = chunks[0].y + 1;
         f.set_cursor_position((cursor_x, cursor_y));
     } else {
-        let cursor_x = chunks[1].x + app.length_input.cursor_position as u16 + 1;
+        let cursor_x = chunks[1].x + (app.length_input.cursor_position as u16).min(chunks[1].width.saturating_sub(2)) + 1;
         let cursor_y = chunks[1].y + 1;
         f.set_cursor_position((cursor_x, cursor_y));
     }
@@ -316,11 +316,11 @@ fn render_update(f: &mut Frame, area: Rect, app: &App) {
 
     // Set cursor position
     if app.active_input == 0 {
-        let cursor_x = chunks[0].x + app.app_name_input.cursor_position as u16 + 1;
+        let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
         let cursor_y = chunks[0].y + 1;
         f.set_cursor_position((cursor_x, cursor_y));
     } else {
-        let cursor_x = chunks[1].x + app.password_input.cursor_position as u16 + 1;
+        let cursor_x = chunks[1].x + (app.password_input.cursor_position as u16).min(chunks[1].width.saturating_sub(2)) + 1;
         let cursor_y = chunks[1].y + 1;
         f.set_cursor_position((cursor_x, cursor_y));
     }
@@ -361,7 +361,7 @@ fn render_delete(f: &mut Frame, area: Rect, app: &App) {
     }
 
     // Set cursor position
-    let cursor_x = chunks[0].x + app.app_name_input.cursor_position as u16 + 1;
+    let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
     let cursor_y = chunks[0].y + 1;
     f.set_cursor_position((cursor_x, cursor_y));
 }

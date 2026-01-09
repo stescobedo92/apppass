@@ -188,7 +188,13 @@ impl App {
             KeyCode::Enter => {
                 if !self.app_name_input.value.is_empty() {
                     let length = if !self.length_input.value.is_empty() {
-                        self.length_input.value.parse::<usize>().ok()
+                        match self.length_input.value.parse::<usize>() {
+                            Ok(len) => Some(len),
+                            Err(_) => {
+                                self.status_message = "✗ Invalid length value".to_string();
+                                return Ok(());
+                            }
+                        }
                     } else {
                         None
                     };
@@ -258,7 +264,11 @@ impl App {
                         });
                     }
                 }
+            } else {
+                self.status_message = "No passwords found in keyring".to_string();
             }
+        } else {
+            self.status_message = "Failed to access keyring".to_string();
         }
     }
 
@@ -329,6 +339,9 @@ impl App {
                                 "✓ Password updated for '{}'",
                                 self.app_name_input.value
                             );
+                            self.app_name_input.clear();
+                            self.password_input.clear();
+                            self.active_input = 0;
                         }
                         Err(e) => {
                             self.status_message = format!("✗ Error: {}", e);

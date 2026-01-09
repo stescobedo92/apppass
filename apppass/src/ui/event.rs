@@ -29,15 +29,15 @@ impl EventHandler {
 
     /// Polls for the next event, blocking until one is available or timeout
     pub fn next(&mut self) -> io::Result<Event> {
-        loop {
-            if event::poll(self.poll_timeout)? {
-                match event::read()? {
-                    CrosstermEvent::Key(key) => return Ok(Event::Key(key)),
-                    CrosstermEvent::Mouse(_) => return Ok(Event::Mouse),
-                    CrosstermEvent::Resize(_, _) => return Ok(Event::Resize),
-                    _ => {}
-                }
+        if event::poll(self.poll_timeout)? {
+            match event::read()? {
+                CrosstermEvent::Key(key) => return Ok(Event::Key(key)),
+                CrosstermEvent::Mouse(_) => return Ok(Event::Mouse),
+                CrosstermEvent::Resize(_, _) => return Ok(Event::Resize),
+                _ => {}
             }
         }
+        // Return a resize event as a no-op on timeout
+        Ok(Event::Resize)
     }
 }
