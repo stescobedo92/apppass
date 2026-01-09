@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event as CrosstermEvent, KeyEvent};
+use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use std::io;
 use std::time::Duration;
 
@@ -31,7 +31,13 @@ impl EventHandler {
     pub fn next(&mut self) -> io::Result<Event> {
         if event::poll(self.poll_timeout)? {
             match event::read()? {
-                CrosstermEvent::Key(key) => return Ok(Event::Key(key)),
+                CrosstermEvent::Key(key) => {
+                    // Only process key press events, ignore release and repeat
+                    // This prevents duplicate characters when typing
+                    if key.kind == KeyEventKind::Press {
+                        return Ok(Event::Key(key));
+                    }
+                }
                 CrosstermEvent::Mouse(_) => return Ok(Event::Mouse),
                 CrosstermEvent::Resize(_, _) => return Ok(Event::Resize),
                 _ => {}
