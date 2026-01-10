@@ -122,6 +122,7 @@ fn render_create(f: &mut Frame, area: Rect, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
+            Constraint::Length(5),
             Constraint::Length(3),
             Constraint::Min(0),
         ])
@@ -138,11 +139,14 @@ fn render_create(f: &mut Frame, area: Rect, app: &App) {
         );
     f.render_widget(app_name_input, chunks[0]);
 
-    // Info message
-    let info = Paragraph::new("Password will be auto-generated with 30 characters")
-        .style(Style::default().fg(Color::Gray))
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).title("Info"));
+    // Info section
+    let info_text = "ℹ️  Create New Password (Auto-generated)\n\
+                     Generates a secure 30-character password automatically.\n\
+                     Example: Enter 'gmail' to create a password for Gmail.";
+    let info = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Info"))
+        .wrap(Wrap { trim: false });
     f.render_widget(info, chunks[1]);
 
     // Status message
@@ -171,6 +175,7 @@ fn render_create_custom(f: &mut Frame, area: Rect, app: &App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Length(3),
+            Constraint::Length(5),
             Constraint::Length(3),
             Constraint::Min(0),
         ])
@@ -209,6 +214,16 @@ fn render_create_custom(f: &mut Frame, area: Rect, app: &App) {
         );
     f.render_widget(password_input, chunks[1]);
 
+    // Info section
+    let info_text = "ℹ️  Create Custom Password\n\
+                     Save your own password of any length to the keyring.\n\
+                     Example: Enter 'github' and your custom password.";
+    let info = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Info"))
+        .wrap(Wrap { trim: false });
+    f.render_widget(info, chunks[2]);
+
     // Status message
     if !app.status_message.is_empty() {
         let status_color = if app.status_message.starts_with('✓') {
@@ -219,7 +234,7 @@ fn render_create_custom(f: &mut Frame, area: Rect, app: &App) {
         let status = Paragraph::new(app.status_message.as_str())
             .style(Style::default().fg(status_color))
             .block(Block::default().borders(Borders::ALL).title("Status"));
-        f.render_widget(status, chunks[2]);
+        f.render_widget(status, chunks[3]);
     }
 
     // Set cursor position
@@ -228,7 +243,7 @@ fn render_create_custom(f: &mut Frame, area: Rect, app: &App) {
         let cursor_y = chunks[0].y + 1;
         f.set_cursor_position((cursor_x, cursor_y));
     } else {
-        let cursor_x = chunks[1].x + (app.length_input.cursor_position as u16).min(chunks[1].width.saturating_sub(2)) + 1;
+        let cursor_x = chunks[1].x + (app.password_input.cursor_position as u16).min(chunks[1].width.saturating_sub(2)) + 1;
         let cursor_y = chunks[1].y + 1;
         f.set_cursor_position((cursor_x, cursor_y));
     }
@@ -327,6 +342,7 @@ fn render_update(f: &mut Frame, area: Rect, app: &App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Length(3),
+            Constraint::Length(5),
             Constraint::Length(3),
             Constraint::Min(0),
         ])
@@ -365,6 +381,16 @@ fn render_update(f: &mut Frame, area: Rect, app: &App) {
         );
     f.render_widget(password_input, chunks[1]);
 
+    // Info section
+    let info_text = "ℹ️  Update Password\n\
+                     Updates the password for an existing application.\n\
+                     Example: Enter 'gmail' and the new password to update.";
+    let info = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Info"))
+        .wrap(Wrap { trim: false });
+    f.render_widget(info, chunks[2]);
+
     // Status message
     if !app.status_message.is_empty() {
         let status_color = if app.status_message.starts_with('✓') {
@@ -375,7 +401,7 @@ fn render_update(f: &mut Frame, area: Rect, app: &App) {
         let status = Paragraph::new(app.status_message.as_str())
             .style(Style::default().fg(status_color))
             .block(Block::default().borders(Borders::ALL).title("Status"));
-        f.render_widget(status, chunks[2]);
+        f.render_widget(status, chunks[3]);
     }
 
     // Set cursor position
@@ -396,6 +422,7 @@ fn render_delete(f: &mut Frame, area: Rect, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
+            Constraint::Length(5),
             Constraint::Length(3),
             Constraint::Min(0),
         ])
@@ -411,6 +438,16 @@ fn render_delete(f: &mut Frame, area: Rect, app: &App) {
         );
     f.render_widget(app_name_input, chunks[0]);
 
+    // Info section
+    let info_text = "ℹ️  Delete Password\n\
+                     Permanently removes a password from the keyring.\n\
+                     Example: Enter 'oldapp' to delete its password.";
+    let info = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Info"))
+        .wrap(Wrap { trim: false });
+    f.render_widget(info, chunks[1]);
+
     // Status message
     if !app.status_message.is_empty() {
         let status_color = if app.status_message.starts_with('✓') {
@@ -421,7 +458,7 @@ fn render_delete(f: &mut Frame, area: Rect, app: &App) {
         let status = Paragraph::new(app.status_message.as_str())
             .style(Style::default().fg(status_color))
             .block(Block::default().borders(Borders::ALL).title("Status"));
-        f.render_widget(status, chunks[1]);
+        f.render_widget(status, chunks[2]);
     }
 
     // Set cursor position
@@ -517,6 +554,7 @@ fn render_memorizable(f: &mut Frame, area: Rect, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
+            Constraint::Length(5),
             Constraint::Length(3),
             Constraint::Min(0),
         ])
@@ -532,6 +570,16 @@ fn render_memorizable(f: &mut Frame, area: Rect, app: &App) {
         );
     f.render_widget(app_name_input, chunks[0]);
 
+    // Info section
+    let info_text = "ℹ️  Generate Memorizable Password\n\
+                     Creates easy-to-remember passwords (e.g., Tiger-42-Cloud).\n\
+                     Example: Enter 'blog' to generate a memorable password.";
+    let info = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Info"))
+        .wrap(Wrap { trim: false });
+    f.render_widget(info, chunks[1]);
+
     // Status message
     if !app.status_message.is_empty() {
         let status_color = if app.status_message.starts_with('✓') {
@@ -542,7 +590,7 @@ fn render_memorizable(f: &mut Frame, area: Rect, app: &App) {
         let status = Paragraph::new(app.status_message.as_str())
             .style(Style::default().fg(status_color))
             .block(Block::default().borders(Borders::ALL).title("Status"));
-        f.render_widget(status, chunks[1]);
+        f.render_widget(status, chunks[2]);
     }
 
     // Set cursor position

@@ -1,5 +1,4 @@
 use crate::app::keyring::{delete_from_keyring, get_from_keyring, save_to_keyring};
-use crate::app::APPLICATION_DATA;
 use keyring::Error as KeyringError;
 use rand::distributions::Alphanumeric;
 use rand::prelude::SliceRandom;
@@ -35,15 +34,26 @@ pub fn get_password_for_specify_app(app_name: &str) -> Result<(), KeyringError> 
 /// * `app_name` - A string slice that holds the name of the application for which the password is updated.
 /// * `new_password` - A string slice that holds the new password to be saved.
 pub fn update_password(app_name: &str, new_password: &str) -> Result<(), KeyringError> {
-    match save_to_keyring(app_name, new_password) {
+    // Check if password exists before updating
+    match get_from_keyring(app_name) {
         Ok(_) => {
-            println!("Password updated successfully for '{}'.", app_name);
-            Ok(())
+            // Password exists, proceed with update
+            match save_to_keyring(app_name, new_password) {
+                Ok(_) => {
+                    println!("Password updated successfully for '{}'.", app_name);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("Failed to update password for '{}': {}", app_name, e);
+                    Err(e)
+                }
+            }
         }
-        Err(e) => {
-            eprintln!("Failed to update password for '{}': {}", app_name, e);
-            Err(e)
+        Err(KeyringError::NoEntry) => {
+            eprintln!("No password found for '{}'. Use create to add a new password.", app_name);
+            Err(KeyringError::NoEntry)
         }
+        Err(e) => Err(e),
     }
 }
 
@@ -56,6 +66,18 @@ pub fn update_password(app_name: &str, new_password: &str) -> Result<(), Keyring
 /// * `app_name` - A string slice that holds the name of the application for which the password is generated.
 /// * `length` - An optional length for the generated password.
 pub fn generate_save_safety_password(app_name: &str, length: Option<usize>) -> Result<(), KeyringError> {
+    // Check if password already exists
+    match get_from_keyring(app_name) {
+        Ok(_) => {
+            eprintln!("Password already exists for '{}'. Use update to change it.", app_name);
+            return Err(KeyringError::NoEntry);
+        }
+        Err(KeyringError::NoEntry) => {
+            // Continue - this is what we want
+        }
+        Err(e) => return Err(e),
+    }
+
     let length = length.unwrap_or(30);
 
     let rand_password: String = thread_rng()
@@ -106,16 +128,33 @@ pub fn delete_password(app_name: &str) -> Result<(), KeyringError> {
 ///
 /// * `file_path` - A string slice that holds the path to the file where passwords will be exported.
 pub fn export_passwords(file_path: &str) -> Result<(), KeyringError> {
-    let application_data = APPLICATION_DATA.lock().unwrap();
+    use crate::app::{APP_SERVICE, APP_INDEX};
+    use keyring::Entry;
+    
+    // Get the index of all applications from keyring
+    let entry = Entry::new(APP_SERVICE, APP_INDEX)?;
+    let app_names_str = match entry.get_password() {
+        Ok(data) => data,
+        Err(KeyringError::NoEntry) => {
+            println!("No passwords found to export.");
+            return Ok(());
+        }
+        Err(e) => return Err(e),
+    };
+    
+    let app_names: Vec<&str> = app_names_str.split(',').filter(|s| !s.is_empty()).collect();
     let mut content = String::new();
 
-    for app_name in application_data.iter() {
+    for app_name in app_names {
         if let Ok(password) = get_from_keyring(app_name) {
             content.push_str(&format!("{},{}\n", app_name, password));
         }
     }
 
-    if std::fs::write(file_path, content).is_ok() {
+    if content.is_empty() {
+        println!("No passwords found to export.");
+        Ok(())
+    } else if std::fs::write(file_path, content).is_ok() {
         println!("Passwords exported to '{}'.", file_path);
         Ok(())
     } else {
@@ -158,6 +197,18 @@ pub fn import_passwords(file_path: &str) -> Result<(), KeyringError> {
 ///
 /// * `app_name` - A string slice that holds the name of the application for which the password is generated.
 pub fn generate_memorizable_password(app_name: &str) -> Result<(), KeyringError> {
+    // Check if password already exists
+    match get_from_keyring(app_name) {
+        Ok(_) => {
+            eprintln!("Password already exists for '{}'. Use update to change it.", app_name);
+            return Err(KeyringError::NoEntry);
+        }
+        Err(KeyringError::NoEntry) => {
+            // Continue - this is what we want
+        }
+        Err(e) => return Err(e),
+    }
+
     let words = vec!["Tiger", "Orange", "Mountain", "River", "Cloud", "Sky", "Sun", "Moon"];
     let mut rng = thread_rng();
 
