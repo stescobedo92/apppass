@@ -1,6 +1,6 @@
 #[warn(unused_variables)]
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use std::thread;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -17,11 +17,6 @@ use crate::app::keyring::{save_to_keyring, delete_from_keyring};
 ///
 /// * `Result<String, String>` - Returns the generated OTP on success, or an error message on failure.
 pub fn generate_otp(app_name: &str, ttl_seconds: u64) -> Result<String, String> {
-    let expiration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        + Duration::new(ttl_seconds, 0);
-
     let otp: String = thread_rng()
         .sample_iter(&Alphanumeric)
         .take(10)
@@ -36,7 +31,12 @@ pub fn generate_otp(app_name: &str, ttl_seconds: u64) -> Result<String, String> 
             thread::spawn(move || {
                 thread::sleep(Duration::from_secs(ttl_seconds));
                 // Attempt to delete the OTP from keyring
-                let _ = delete_from_keyring(&app_name_owned);
+                // Note: The thread will continue even if the main program exits.
+                // This is acceptable as the OS will clean up the thread when it completes.
+                if let Err(e) = delete_from_keyring(&app_name_owned) {
+                    // Log error if deletion fails (e.g., already manually deleted)
+                    eprintln!("Warning: Failed to auto-delete OTP for '{}': {}", app_name_owned, e);
+                }
             });
 
             Ok(otp)
