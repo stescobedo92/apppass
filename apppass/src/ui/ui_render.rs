@@ -437,6 +437,7 @@ fn render_generate_otp(f: &mut Frame, area: Rect, app: &App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Length(3),
+            Constraint::Length(5),
             Constraint::Length(3),
             Constraint::Min(0),
         ])
@@ -475,6 +476,16 @@ fn render_generate_otp(f: &mut Frame, area: Rect, app: &App) {
         );
     f.render_widget(ttl_input, chunks[1]);
 
+    // Info section
+    let info_text = "ℹ️  Generate OTP (One-Time Password)\n\
+                     Creates a temporary password that expires after the specified time.\n\
+                     Example: Enter 'MyApp' and TTL '300' for a 5-minute password.";
+    let info = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Info"))
+        .wrap(Wrap { trim: false });
+    f.render_widget(info, chunks[2]);
+
     // Status message
     if !app.status_message.is_empty() {
         let status_color = if app.status_message.starts_with('✓') {
@@ -485,7 +496,7 @@ fn render_generate_otp(f: &mut Frame, area: Rect, app: &App) {
         let status = Paragraph::new(app.status_message.as_str())
             .style(Style::default().fg(status_color))
             .block(Block::default().borders(Borders::ALL).title("Status"));
-        f.render_widget(status, chunks[2]);
+        f.render_widget(status, chunks[3]);
     }
 
     // Set cursor position
@@ -546,6 +557,7 @@ fn render_export(f: &mut Frame, area: Rect, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
+            Constraint::Length(5),
             Constraint::Length(3),
             Constraint::Min(0),
         ])
@@ -561,6 +573,16 @@ fn render_export(f: &mut Frame, area: Rect, app: &App) {
         );
     f.render_widget(file_path_input, chunks[0]);
 
+    // Info section
+    let info_text = "ℹ️  Export Passwords to CSV\n\
+                     Exports all stored passwords to a CSV file for backup.\n\
+                     Example: Enter 'my_passwords.csv' to create an export file.";
+    let info = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Info"))
+        .wrap(Wrap { trim: false });
+    f.render_widget(info, chunks[1]);
+
     // Status message
     if !app.status_message.is_empty() {
         let status_color = if app.status_message.starts_with('✓') {
@@ -571,7 +593,7 @@ fn render_export(f: &mut Frame, area: Rect, app: &App) {
         let status = Paragraph::new(app.status_message.as_str())
             .style(Style::default().fg(status_color))
             .block(Block::default().borders(Borders::ALL).title("Status"));
-        f.render_widget(status, chunks[1]);
+        f.render_widget(status, chunks[2]);
     }
 
     // Set cursor position
@@ -586,6 +608,7 @@ fn render_import(f: &mut Frame, area: Rect, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
+            Constraint::Length(5),
             Constraint::Length(3),
             Constraint::Min(0),
         ])
@@ -601,6 +624,16 @@ fn render_import(f: &mut Frame, area: Rect, app: &App) {
         );
     f.render_widget(file_path_input, chunks[0]);
 
+    // Info section
+    let info_text = "ℹ️  Import Passwords from CSV\n\
+                     Imports passwords from a CSV file into the keyring.\n\
+                     Example: Enter 'my_passwords.csv' to import from that file.";
+    let info = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Info"))
+        .wrap(Wrap { trim: false });
+    f.render_widget(info, chunks[1]);
+
     // Status message
     if !app.status_message.is_empty() {
         let status_color = if app.status_message.starts_with('✓') {
@@ -611,7 +644,7 @@ fn render_import(f: &mut Frame, area: Rect, app: &App) {
         let status = Paragraph::new(app.status_message.as_str())
             .style(Style::default().fg(status_color))
             .block(Block::default().borders(Borders::ALL).title("Status"));
-        f.render_widget(status, chunks[1]);
+        f.render_widget(status, chunks[2]);
     }
 
     // Set cursor position

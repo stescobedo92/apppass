@@ -2,7 +2,7 @@
 
 [![Crates.io Link](https://crates.io/crates/apppass)](https://crates.io/crates/apppass)
 
-`apppass` is a powerful command-line application that allows you to generate, manage, and secure passwords efficiently. With advanced features like temporary passwords (OTP), memorable passwords, import/export, and auto-lock, `apppass` takes password management to the next level. ✨
+`apppass` is a powerful command-line application that allows you to generate, manage, and secure passwords efficiently. With advanced features like temporary passwords (OTP), memorable passwords, import/export, auto-lock, and an **interactive Terminal UI (TUI)**, `apppass` takes password management to the next level. ✨
 
 ---
 
@@ -24,6 +24,36 @@ $ cargo install apppass
 - 🔄 **Full Password Management**: List, update, delete, import, and export passwords.
 - 🕗 **Auto-Lock**: Locks the application after a period of inactivity.
 - 📂 **Export/Import**: Exchange passwords via CSV files.
+- 🖥️ **Interactive Terminal UI**: User-friendly TUI for all operations with Ratatui.
+
+---
+
+## 🖥️ **Interactive UI Mode**
+
+Launch the interactive Terminal User Interface for a visual, menu-driven experience:
+
+```bash
+$ ./apppass --ui
+```
+
+The UI provides:
+- ✅ **Main Menu** with 11 options for all operations
+- ✅ **Create Password** (auto-generated or custom)
+- ✅ **List & View** passwords with navigation
+- ✅ **Update & Delete** passwords
+- ✅ **Generate OTP** with configurable TTL
+- ✅ **Memorable Passwords** generation
+- ✅ **Export/Import** to/from CSV files
+- ✅ **Keyboard navigation** (arrows, Enter, Esc, Tab)
+- ✅ **Context-sensitive help** in footer
+- ✅ **Visual feedback** with colored status messages
+
+### UI Navigation:
+- **↑↓**: Navigate menu items
+- **Enter**: Select option or confirm
+- **Tab**: Switch between input fields
+- **Esc**: Go back or cancel
+- **q**: Quit from main menu
 
 ---
 
