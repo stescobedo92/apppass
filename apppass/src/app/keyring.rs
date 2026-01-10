@@ -48,6 +48,13 @@ pub fn delete_from_keyring(app_name: &str) -> Result<(), KeyringError> {
     let entry = Entry::new(APP_SERVICE, app_name)?;
     entry.delete_credential()?;
     update_index(app_name, false)?;
+    
+    // Also delete type metadata if it exists
+    let type_key = format!("{}{}", app_name, crate::app::PASSWORD_TYPE_SUFFIX);
+    let type_entry = Entry::new(APP_SERVICE, &type_key);
+    if let Ok(entry) = type_entry {
+        let _ = entry.delete_credential(); // Ignore error if metadata doesn't exist
+    }
     Ok(())
 }
 
@@ -117,6 +124,91 @@ pub fn show_list_applications() {
         },
         Err(e) => eprintln!("Failed to access index: {}", e),
     }
+}
+
+/// Sets the type of password (auto-generated or custom) for tracking purposes.
+///
+/// # Arguments
+///
+/// * `app_name` - The name of the application.
+/// * `password_type` - The type of password: "auto" or "custom".
+///
+/// # Returns
+///
+/// * `Result<(), KeyringError>` - Returns `Ok(())` if successful.
+pub fn set_password_type(app_name: &str, password_type: &str) -> Result<(), KeyringError> {
+    let type_key = format!("{}{}", app_name, crate::app::PASSWORD_TYPE_SUFFIX);
+    let entry = Entry::new(APP_SERVICE, &type_key)?;
+    entry.set_password(password_type)?;
+    Ok(())
+}
+
+/// Gets the type of password for a given application.
+///
+/// # Arguments
+///
+/// * `app_name` - The name of the application.
+///
+/// # Returns
+///
+/// * `Option<String>` - Returns Some("auto") or Some("custom"), or None if not set.
+pub fn get_password_type(app_name: &str) -> Option<String> {
+    let type_key = format!("{}{}", app_name, crate::app::PASSWORD_TYPE_SUFFIX);
+    if let Ok(entry) = Entry::new(APP_SERVICE, &type_key) {
+        entry.get_password().ok()
+    } else {
+        None
+    }
+}
+
+/// Checks if there are any auto-generated passwords in the keyring.
+///
+/// # Returns
+///
+/// * `bool` - Returns true if there are auto-generated passwords.
+pub fn has_auto_passwords() -> bool {
+    if let Ok(entry) = Entry::new(APP_SERVICE, APP_INDEX) {
+        if let Ok(data) = entry.get_password() {
+            let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
+            for app_name in app_names {
+                // Skip metadata entries
+                if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
+                    continue;
+                }
+                if let Some(pw_type) = get_password_type(app_name) {
+                    if pw_type == "auto" {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Checks if there are any custom passwords in the keyring.
+///
+/// # Returns
+///
+/// * `bool` - Returns true if there are custom passwords.
+pub fn has_custom_passwords() -> bool {
+    if let Ok(entry) = Entry::new(APP_SERVICE, APP_INDEX) {
+        if let Ok(data) = entry.get_password() {
+            let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
+            for app_name in app_names {
+                // Skip metadata entries
+                if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
+                    continue;
+                }
+                if let Some(pw_type) = get_password_type(app_name) {
+                    if pw_type == "custom" {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
 }
 
 #[cfg(test)]

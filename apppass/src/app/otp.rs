@@ -4,7 +4,7 @@ use std::time::Duration;
 use std::thread;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use crate::app::keyring::{save_to_keyring, delete_from_keyring};
+use crate::app::keyring::{save_to_keyring, delete_from_keyring, set_password_type};
 
 /// Generates a one-time password (OTP), saves it to the keyring, and schedules automatic deletion.
 ///
@@ -37,6 +37,11 @@ pub fn generate_otp(app_name: &str, ttl_seconds: u64, length: usize) -> Result<S
     // Save OTP to keyring
     match save_to_keyring(app_name, &otp) {
         Ok(_) => {
+            // Mark as auto-generated
+            if let Err(e) = set_password_type(app_name, "auto") {
+                eprintln!("Warning: Failed to set password type for OTP: {}", e);
+            }
+            
             // Spawn a background thread to delete the OTP after TTL expires
             let app_name_owned = app_name.to_string();
             thread::spawn(move || {

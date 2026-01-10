@@ -1,4 +1,5 @@
 use crate::ui::app::{App, Mode};
+use crate::app::keyring::{has_auto_passwords, has_custom_passwords};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -141,13 +142,15 @@ fn render_settings(f: &mut Frame, area: Rect, app: &App) {
 /// Renders the main menu
 fn render_menu(f: &mut Frame, area: Rect, app: &App) {
     let has_passwords = app.has_passwords();
+    let has_auto = has_auto_passwords();
+    let has_custom = has_custom_passwords();
     
     let menu_items = vec![
         ("Create New Password (Auto-generated)", true),
         ("Create Custom Password", true),
         ("List All Passwords", true),
-        ("Update Auto-generated Password", has_passwords),
-        ("Update Custom Password", has_passwords),
+        ("Update Auto-generated Password", has_auto),
+        ("Update Custom Password", has_custom),
         ("Delete Password", has_passwords),
         ("Generate OTP (One-Time Password)", true),
         ("Generate Memorizable Password", true),
@@ -165,7 +168,17 @@ fn render_menu(f: &mut Frame, area: Rect, app: &App) {
             let text = if *enabled {
                 format!("  {}  ", item)
             } else {
-                format!("  {} (No passwords)  ", item)
+                // Customize message based on menu item
+                let suffix = if i == 3 {
+                    // UpdateAuto
+                    "(No auto passwords)"
+                } else if i == 4 {
+                    // UpdateCustom
+                    "(No custom passwords)"
+                } else {
+                    "(No passwords)"
+                };
+                format!("  {} {}  ", item, suffix)
             };
             
             let style = if i == app.selected_menu {

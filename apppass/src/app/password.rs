@@ -1,4 +1,4 @@
-use crate::app::keyring::{delete_from_keyring, get_from_keyring, save_to_keyring};
+use crate::app::keyring::{delete_from_keyring, get_from_keyring, save_to_keyring, set_password_type};
 use keyring::Error as KeyringError;
 use rand::distributions::Alphanumeric;
 use rand::prelude::SliceRandom;
@@ -61,7 +61,9 @@ pub fn generate_save_safety_password(app_name: &str, length: Option<usize>) -> R
         .map(char::from)
         .collect();
 
-    save_to_keyring(app_name, &rand_password)
+    save_to_keyring(app_name, &rand_password)?;
+    set_password_type(app_name, "auto")?;
+    Ok(())
 }
 
 /// Deletes the password for the specified application from the keyring.
@@ -98,6 +100,10 @@ pub fn export_passwords(file_path: &str) -> Result<(), KeyringError> {
     let mut content = String::new();
 
     for app_name in app_names {
+        // Skip metadata entries (password_length and _type suffixes)
+        if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
+            continue;
+        }
         if let Ok(password) = get_from_keyring(app_name) {
             content.push_str(&format!("{},{}\n", app_name, password));
         }
@@ -128,6 +134,7 @@ pub fn import_passwords(file_path: &str) -> Result<(), KeyringError> {
                 let app_name = key_value[0];
                 let password = key_value[1];
                 save_to_keyring(app_name, password)?;
+                set_password_type(app_name, "custom")?; // Mark imported passwords as custom
             }
         }
         Ok(())
@@ -165,7 +172,9 @@ pub fn generate_memorizable_password(app_name: &str) -> Result<(), KeyringError>
         words.choose(&mut rng).unwrap()
     );
 
-    save_to_keyring(app_name, &password)
+    save_to_keyring(app_name, &password)?;
+    set_password_type(app_name, "auto")?;
+    Ok(())
 }
 
 #[cfg(test)]

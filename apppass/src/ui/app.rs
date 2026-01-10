@@ -1,4 +1,4 @@
-use crate::app::keyring::{delete_from_keyring, get_from_keyring, save_to_keyring};
+use crate::app::keyring::{delete_from_keyring, get_from_keyring, save_to_keyring, set_password_type, has_auto_passwords, has_custom_passwords};
 use crossterm::event::{KeyCode, KeyEvent};
 use keyring::Entry;
 use std::io;
@@ -360,13 +360,18 @@ impl App {
                         &self.password_input.value,
                     ) {
                         Ok(_) => {
-                            self.status_message = format!(
-                                "✓ Custom password saved for '{}'",
-                                self.app_name_input.value
-                            );
-                            self.app_name_input.clear();
-                            self.password_input.clear();
-                            self.active_input = 0;
+                            // Mark as custom password
+                            if let Err(e) = set_password_type(&self.app_name_input.value, "custom") {
+                                self.status_message = format!("✗ Error setting type: {}", e);
+                            } else {
+                                self.status_message = format!(
+                                    "✓ Custom password saved for '{}'",
+                                    self.app_name_input.value
+                                );
+                                self.app_name_input.clear();
+                                self.password_input.clear();
+                                self.active_input = 0;
+                            }
                         }
                         Err(e) => {
                             self.status_message = format!("✗ Error: {}", e);
@@ -416,8 +421,8 @@ impl App {
             if let Ok(data) = entry.get_password() {
                 let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
                 for app_name in app_names {
-                    // Skip password_length - it's a setting, not a real password
-                    if app_name == crate::app::PASSWORD_LENGTH_KEY {
+                    // Skip password_length and _type metadata - they're settings/metadata, not real passwords
+                    if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
                         continue;
                     }
                     if let Ok(password) = get_from_keyring(app_name) {
@@ -435,12 +440,14 @@ impl App {
         }
     }
 
-    /// Check if there are any real passwords (excluding password_length setting)
+    /// Check if there are any real passwords (excluding password_length setting and _type metadata)
     pub fn has_passwords(&self) -> bool {
         if let Ok(entry) = Entry::new(crate::app::APP_SERVICE, crate::app::APP_INDEX) {
             if let Ok(data) = entry.get_password() {
                 let app_names: Vec<&str> = data.split(',')
-                    .filter(|s| !s.is_empty() && *s != crate::app::PASSWORD_LENGTH_KEY)
+                    .filter(|s| !s.is_empty() 
+                        && *s != crate::app::PASSWORD_LENGTH_KEY
+                        && !s.ends_with(crate::app::PASSWORD_TYPE_SUFFIX))
                     .collect();
                 return !app_names.is_empty();
             }
