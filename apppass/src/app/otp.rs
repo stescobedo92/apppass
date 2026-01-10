@@ -16,6 +16,16 @@ use crate::app::keyring::{save_to_keyring, delete_from_keyring};
 /// # Returns
 ///
 /// * `Result<String, String>` - Returns the generated OTP on success, or an error message on failure.
+///
+/// # Behavior
+///
+/// The OTP is saved to the system keyring and a background thread is spawned to delete it after
+/// the TTL expires. The background thread runs independently and will continue even if the main
+/// program exits before the TTL expires. This ensures the OTP is deleted after the specified time
+/// regardless of whether the program is still running.
+///
+/// If the main program exits and is not restarted before the TTL expires, the OTP will still be
+/// automatically deleted by the background thread. The OS will clean up the thread after it completes.
 pub fn generate_otp(app_name: &str, ttl_seconds: u64) -> Result<String, String> {
     let otp: String = thread_rng()
         .sample_iter(&Alphanumeric)
