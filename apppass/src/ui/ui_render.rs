@@ -31,6 +31,7 @@ pub fn render(f: &mut Frame, app: &App) {
         Mode::Memorizable => render_memorizable(f, chunks[1], app),
         Mode::Export => render_export(f, chunks[1], app),
         Mode::Import => render_import(f, chunks[1], app),
+        Mode::Settings => render_settings(f, chunks[1], app),
     }
 
     render_footer(f, chunks[2], app);
@@ -63,6 +64,7 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
         Mode::Memorizable => "Enter: Generate | Esc: Back",
         Mode::Export => "Enter: Export | Esc: Back",
         Mode::Import => "Enter: Import | Esc: Back",
+        Mode::Settings => "Enter: Save | Esc: Cancel",
     };
 
     let footer = Paragraph::new(help_text)
@@ -70,6 +72,65 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(footer, area);
+}
+
+/// Renders the settings form (password length configuration)
+fn render_settings(f: &mut Frame, area: Rect, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(8),
+            Constraint::Length(3),
+            Constraint::Min(0),
+        ])
+        .margin(2)
+        .split(area);
+
+    // Password length input
+    let length_input = Paragraph::new(app.length_input.value.as_str())
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .block(
+            Block::default()
+                .title("Default Password Length (8-128 characters)")
+                .borders(Borders::ALL),
+        );
+    f.render_widget(length_input, chunks[0]);
+
+    // Info section
+    let info_text = format!(
+        "ℹ️  Settings - Password Length Configuration\n\
+         \n\
+         Set the default length for auto-generated passwords.\n\
+         Current: {} characters\n\
+         Range: 8-128 characters\n\
+         \n\
+         This affects: Create New Password, Generate Memorizable Password",
+        app.default_password_length
+    );
+    let info = Paragraph::new(info_text)
+        .style(Style::default().fg(Color::Cyan))
+        .block(Block::default().borders(Borders::ALL).title("Info"))
+        .wrap(Wrap { trim: false });
+    f.render_widget(info, chunks[1]);
+
+    // Status message
+    if !app.status_message.is_empty() {
+        let status_color = if app.status_message.starts_with('✓') {
+            Color::Green
+        } else {
+            Color::Red
+        };
+        let status = Paragraph::new(app.status_message.as_str())
+            .style(Style::default().fg(status_color))
+            .block(Block::default().borders(Borders::ALL).title("Status"));
+        f.render_widget(status, chunks[2]);
+    }
+
+    // Set cursor position
+    let cursor_x = chunks[0].x + (app.length_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
+    let cursor_y = chunks[0].y + 1;
+    f.set_cursor_position((cursor_x, cursor_y));
 }
 
 /// Renders the main menu
@@ -84,6 +145,7 @@ fn render_menu(f: &mut Frame, area: Rect, app: &App) {
         "Generate Memorizable Password",
         "Export Passwords to CSV",
         "Import Passwords from CSV",
+        "Settings (Password Length)",
         "Set Auto-Lock",
         "Exit",
     ];
@@ -140,9 +202,12 @@ fn render_create(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(app_name_input, chunks[0]);
 
     // Info section
-    let info_text = "ℹ️  Create New Password (Auto-generated)\n\
-                     Generates a secure 30-character password automatically.\n\
-                     Example: Enter 'gmail' to create a password for Gmail.";
+    let info_text = format!(
+        "ℹ️  Create New Password (Auto-generated)\n\
+         Generates a secure {}-character password automatically.\n\
+         Example: Enter 'gmail' to create a password for Gmail.",
+        app.default_password_length
+    );
     let info = Paragraph::new(info_text)
         .style(Style::default().fg(Color::Cyan))
         .block(Block::default().borders(Borders::ALL).title("Info"))
@@ -441,7 +506,7 @@ fn render_delete(f: &mut Frame, area: Rect, app: &App) {
         .margin(2)
         .split(area);
 
-    // Password list for selection
+    // Password list for selection - matching menu style
     let items: Vec<ListItem> = app
         .password_list
         .iter()
@@ -449,8 +514,8 @@ fn render_delete(f: &mut Frame, area: Rect, app: &App) {
         .map(|(i, entry)| {
             let style = if i == app.selected_list_item {
                 Style::default()
-                    .bg(Color::DarkGray)
-                    .fg(Color::Yellow)
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
                     .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
@@ -462,7 +527,7 @@ fn render_delete(f: &mut Frame, area: Rect, app: &App) {
     let list = List::new(items)
         .block(
             Block::default()
-                .title("Select Application to Delete (↑↓ to navigate, Enter to confirm)")
+                .title("Select Application to Delete")
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White)),
         )

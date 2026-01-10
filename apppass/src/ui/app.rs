@@ -28,6 +28,8 @@ pub enum Mode {
     Export,
     /// Import passwords
     Import,
+    /// Settings (password length configuration)
+    Settings,
 }
 
 /// Input field for forms
@@ -104,6 +106,8 @@ pub struct App {
     pub status_message: String,
     /// Active input field (0 = app name, 1 = password/length)
     pub active_input: usize,
+    /// Default password length for auto-generation
+    pub default_password_length: usize,
 }
 
 impl App {
@@ -118,6 +122,7 @@ impl App {
             length_input: InputField::new(),
             password_list: Vec::new(),
             selected_list_item: 0,
+            default_password_length: 30,
             status_message: String::new(),
             active_input: 0,
         }
@@ -137,6 +142,7 @@ impl App {
             Mode::Memorizable => self.handle_memorizable_key(key),
             Mode::Export => self.handle_export_key(key),
             Mode::Import => self.handle_import_key(key),
+            Mode::Settings => self.handle_settings_key(key),
         }
     }
 
@@ -152,7 +158,7 @@ impl App {
                 }
             }
             KeyCode::Down => {
-                if self.selected_menu < 10 {  // Updated for 11 menu items (0-10)
+                if self.selected_menu < 11 {  // Updated for 12 menu items (0-11)
                     self.selected_menu += 1;
                 }
             }
@@ -215,12 +221,17 @@ impl App {
                         self.app_name_input.clear();  // Use for file path
                     }
                     9 => {
-                        // Set Auto-Lock
-                        self.mode = Mode::Update;  // Reuse update for now, or create new mode
-                        self.status_message = "Auto-lock not implemented in UI yet".to_string();
-                        self.mode = Mode::Menu;
+                        // Settings (Password Length)
+                        self.mode = Mode::Settings;
+                        self.length_input.clear();
+                        self.length_input.value = self.default_password_length.to_string();
+                        self.length_input.cursor_position = self.length_input.value.len();
                     }
                     10 => {
+                        // Set Auto-Lock
+                        self.status_message = "Auto-lock not implemented in UI yet".to_string();
+                    }
+                    11 => {
                         // Exit
                         self.should_quit = true;
                     }
@@ -240,14 +251,15 @@ impl App {
             }
             KeyCode::Enter => {
                 if !self.app_name_input.value.is_empty() {
-                    // Auto-generate password with default length (30)
+                    // Auto-generate password with configured default length
                     match crate::app::password::generate_save_safety_password(
                         &self.app_name_input.value,
-                        None,  // Use default length
+                        Some(self.default_password_length),
                     ) {
                         Ok(_) => {
                             self.status_message = format!(
-                                "✓ Password auto-generated for '{}'",
+                                "✓ Password auto-generated ({} chars) for '{}'",
+                                self.default_password_length,
                                 self.app_name_input.value
                             );
                             self.app_name_input.clear();
@@ -685,6 +697,43 @@ impl App {
             }
             KeyCode::Right => {
                 self.app_name_input.move_cursor_right();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Handles keys in settings mode
+    fn handle_settings_key(&mut self, key: KeyEvent) -> io::Result<()> {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Menu;
+            }
+            KeyCode::Enter => {
+                // Parse and save the new default password length
+                if let Ok(length) = self.length_input.value.parse::<usize>() {
+                    if length >= 8 && length <= 128 {
+                        self.default_password_length = length;
+                        self.status_message = format!("✓ Default password length set to {} characters", length);
+                        self.mode = Mode::Menu;
+                    } else {
+                        self.status_message = "✗ Length must be between 8 and 128 characters".to_string();
+                    }
+                } else {
+                    self.status_message = "✗ Please enter a valid number".to_string();
+                }
+            }
+            KeyCode::Char(c) if c.is_ascii_digit() => {
+                self.length_input.insert_char(c);
+            }
+            KeyCode::Backspace => {
+                self.length_input.delete_char();
+            }
+            KeyCode::Left => {
+                self.length_input.move_cursor_left();
+            }
+            KeyCode::Right => {
+                self.length_input.move_cursor_right();
             }
             _ => {}
         }
