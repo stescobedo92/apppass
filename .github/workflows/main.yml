@@ -41,6 +41,7 @@ jobs:
         with:
           command: test
           args: -- --test-threads=1
+        working-directory: apppass
 
   build:
     name: Build (${{ matrix.config.name }})
@@ -91,13 +92,14 @@ jobs:
 
       - name: Build Release
         shell: bash
+        working-directory: apppass
         run: cargo build --release --target ${{ matrix.config.target }}
 
       - name: Package Binary
         shell: bash
         run: |
           mkdir -p dist
-          cp target/${{ matrix.config.target }}/release/apppass${{ matrix.config.ext }} dist/
+          cp apppass/target/${{ matrix.config.target }}/release/apppass${{ matrix.config.ext }} dist/
           
           case "${{ matrix.config.archive }}" in
             "tar.gz")

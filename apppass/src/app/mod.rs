@@ -7,6 +7,8 @@ pub mod password;
 pub mod otp;
 pub mod lock;
 
-static APP_INDEX: &str = "apppass_index";
-static APP_SERVICE: &str = "apppass";
+pub static APP_INDEX: &str = "apppass_index";
+pub static APP_SERVICE: &str = "apppass";
+pub static PASSWORD_LENGTH_KEY: &str = "password_length";
+pub static PASSWORD_TYPE_SUFFIX: &str = "_type";
 static APPLICATION_DATA: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));

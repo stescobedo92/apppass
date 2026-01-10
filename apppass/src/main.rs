@@ -1,4 +1,5 @@
 mod app;
+mod ui;
 
 use clap::{Arg, ArgAction, Command};
 use crate::app::keyring::show_list_applications;
@@ -91,13 +92,31 @@ fn main() {
                 .action(ArgAction::Set)
                 .help("Set auto-lock timeout in seconds"),
         )
+        .arg(
+            Arg::new("ui")
+                .long("ui")
+                .action(ArgAction::SetTrue)
+                .help("Launch interactive UI mode"),
+        )
         .get_matches();
+
+    // If UI flag is set, launch the interactive TUI
+    if *apppass.get_one::<bool>("ui").unwrap_or(&false) {
+        if let Err(e) = ui::run_tui() {
+            eprintln!("Error running UI: {}", e);
+            std::process::exit(1);
+        }
+        return;
+    }
 
     if let Some(name) = apppass.get_one::<String>("app") {
         let length = apppass
             .get_one::<String>("length")
             .and_then(|l| l.parse::<usize>().ok());
-        generate_save_safety_password(name, length);
+        match generate_save_safety_password(name, length) {
+            Ok(_) => println!("Password saved securely for '{}'.", name),
+            Err(_) => eprintln!("Password already exists for '{}'. Use update to change it.", name),
+        }
     }
 
     if *apppass.get_one::<bool>("list").unwrap_or(&false) {
@@ -105,24 +124,42 @@ fn main() {
     }
 
     if let Some(name) = apppass.get_one::<String>("get") {
-        get_password_for_specify_app(name);
+        match get_password_for_specify_app(name) {
+            Ok(password) => {
+                println!("Application Name: {}", name);
+                println!("Password: {}", password);
+            }
+            Err(_) => println!("No password found for '{}'.", name),
+        }
     }
 
     if let Some(name) = apppass.get_one::<String>("delete") {
-        delete_password(name);
+        match delete_password(name) {
+            Ok(_) => println!("Password for '{}' deleted successfully.", name),
+            Err(_) => println!("No password found for '{}'.", name),
+        }
     }
 
     if let Some(name) = apppass.get_one::<String>("update") {
         let new_pass = "new_secure_password";
-        update_password(name, new_pass);
+        match update_password(name, new_pass) {
+            Ok(_) => println!("Password updated successfully for '{}'.", name),
+            Err(_) => eprintln!("No password found for '{}'. Use create to add a new password.", name),
+        }
     }
 
     if let Some(path) = apppass.get_one::<String>("export") {
-        export_passwords(path);
+        match export_passwords(path) {
+            Ok(_) => println!("Passwords exported to '{}'.", path),
+            Err(_) => eprintln!("Failed to export passwords to '{}'.", path),
+        }
     }
 
     if let Some(path) = apppass.get_one::<String>("import") {
-        import_passwords(path);
+        match import_passwords(path) {
+            Ok(_) => println!("Passwords imported from '{}'.", path),
+            Err(_) => eprintln!("Failed to import passwords from '{}'.", path),
+        }
     }
 
     if let Some(name) = apppass.get_one::<String>("otp") {
@@ -130,11 +167,29 @@ fn main() {
             .get_one::<String>("ttl")
             .and_then(|t| t.parse::<u64>().ok())
             .unwrap_or(300);
-        generate_otp(name, ttl);
+        
+        // Load password length from keyring, default to 30
+        let password_length = crate::app::keyring::get_from_keyring(crate::app::PASSWORD_LENGTH_KEY)
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(30);
+        
+        match generate_otp(name, ttl, password_length) {
+            Ok(otp) => {
+                println!("OTP generated and saved for '{}'", name);
+                println!("Temporary Password: {}", otp);
+                println!("Expires in: {} seconds", ttl);
+                println!("\nThis password will be automatically deleted from the keyring after {} seconds.", ttl);
+            }
+            Err(e) => eprintln!("Failed to generate OTP: {}", e),
+        }
     }
 
     if let Some(name) = apppass.get_one::<String>("memorizable") {
-        generate_memorizable_password(name);
+        match generate_memorizable_password(name) {
+            Ok(_) => println!("Memorizable password saved for '{}'.", name),
+            Err(_) => eprintln!("Password already exists for '{}'. Use update to change it.", name),
+        }
     }
 
     if let Some(lock_time) = apppass.get_one::<String>("lock") {
