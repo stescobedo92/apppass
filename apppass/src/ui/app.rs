@@ -111,8 +111,6 @@ pub struct App {
 }
 
 impl App {
-    const PASSWORD_LENGTH_KEY: &'static str = "password_length";
-
     /// Creates a new App instance
     pub fn new() -> Self {
         // Load default password length from keyring (persistent setting)
@@ -135,21 +133,29 @@ impl App {
 
     /// Load password length setting from keyring
     fn load_password_length_setting() -> Option<usize> {
-        match get_from_keyring(Self::PASSWORD_LENGTH_KEY) {
-            Ok(value) => value.parse::<usize>().ok(),
-            Err(_) => None,
+        match get_from_keyring(crate::app::PASSWORD_LENGTH_KEY) {
+            Ok(value) => {
+                value.parse::<usize>().ok().filter(|&len| len >= 8 && len <= 128)
+            }
+            Err(_) => {
+                // No saved setting or keyring access failed - use default
+                None
+            }
         }
     }
 
     /// Save password length setting to keyring
     fn save_password_length_setting(length: usize) -> Result<(), String> {
-        save_to_keyring(Self::PASSWORD_LENGTH_KEY, &length.to_string())
+        save_to_keyring(crate::app::PASSWORD_LENGTH_KEY, &length.to_string())
             .map_err(|e| format!("Failed to save setting: {}", e))
     }
 
-    /// Delete password length setting from keyring
+    /// Delete password length setting from keyring (resets to default)
+    /// Note: Currently unused - user can change value instead of deleting.
+    /// Kept for potential future use (e.g., explicit "Reset to Default" option).
+    #[allow(dead_code)]
     fn delete_password_length_setting() -> Result<(), String> {
-        delete_from_keyring(Self::PASSWORD_LENGTH_KEY)
+        delete_from_keyring(crate::app::PASSWORD_LENGTH_KEY)
             .map_err(|e| format!("Failed to delete setting: {}", e))
     }
 

@@ -169,7 +169,7 @@ fn main() {
             .unwrap_or(300);
         
         // Load password length from keyring, default to 30
-        let password_length = crate::app::keyring::get_from_keyring("password_length")
+        let password_length = crate::app::keyring::get_from_keyring(crate::app::PASSWORD_LENGTH_KEY)
             .ok()
             .and_then(|v| v.parse::<usize>().ok())
             .unwrap_or(30);

@@ -9,4 +9,5 @@ pub mod lock;
 
 pub static APP_INDEX: &str = "apppass_index";
 pub static APP_SERVICE: &str = "apppass";
+pub static PASSWORD_LENGTH_KEY: &str = "password_length";
 static APPLICATION_DATA: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
