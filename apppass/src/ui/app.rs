@@ -189,6 +189,8 @@ impl App {
                         // Delete Password
                         self.mode = Mode::Delete;
                         self.app_name_input.clear();
+                        self.load_passwords();  // Load passwords for selection
+                        self.selected_list_item = 0;
                     }
                     5 => {
                         // Generate OTP
@@ -476,15 +478,26 @@ impl App {
             KeyCode::Esc => {
                 self.mode = Mode::Menu;
             }
+            KeyCode::Up => {
+                if self.selected_list_item > 0 {
+                    self.selected_list_item -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if self.selected_list_item < self.password_list.len().saturating_sub(1) {
+                    self.selected_list_item += 1;
+                }
+            }
             KeyCode::Enter => {
-                if !self.app_name_input.value.is_empty() {
-                    match delete_from_keyring(&self.app_name_input.value) {
+                if !self.password_list.is_empty() && self.selected_list_item < self.password_list.len() {
+                    let app_name = self.password_list[self.selected_list_item].app_name.clone();
+                    match delete_from_keyring(&app_name) {
                         Ok(_) => {
-                            self.status_message = format!(
-                                "✓ Password deleted for '{}'",
-                                self.app_name_input.value
-                            );
-                            self.app_name_input.clear();
+                            self.status_message = format!("✓ Password deleted for '{}'", app_name);
+                            self.load_passwords();  // Reload the list
+                            if self.selected_list_item >= self.password_list.len() && self.selected_list_item > 0 {
+                                self.selected_list_item -= 1;
+                            }
                         }
                         Err(e) => {
                             self.status_message = format!("✗ Error: {}", e);
@@ -492,17 +505,9 @@ impl App {
                     }
                 }
             }
-            KeyCode::Char(c) => {
-                self.app_name_input.insert_char(c);
-            }
-            KeyCode::Backspace => {
-                self.app_name_input.delete_char();
-            }
-            KeyCode::Left => {
-                self.app_name_input.move_cursor_left();
-            }
-            KeyCode::Right => {
-                self.app_name_input.move_cursor_right();
+            KeyCode::Char('r') => {
+                self.load_passwords();
+                self.status_message = "✓ List refreshed".to_string();
             }
             _ => {}
         }

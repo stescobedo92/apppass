@@ -58,7 +58,7 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
         Mode::List => "↑↓: Navigate | Enter: View | r: Refresh | Esc: Back",
         Mode::View => "Enter/Esc: Back",
         Mode::Update => "Tab: Switch Field | Enter: Update | Esc: Back",
-        Mode::Delete => "Enter: Delete | Esc: Back",
+        Mode::Delete => "↑↓: Navigate | Enter: Delete | r: Refresh | Esc: Back",
         Mode::GenerateOTP => "Tab: Switch Field | Enter: Generate | Esc: Back",
         Mode::Memorizable => "Enter: Generate | Esc: Back",
         Mode::Export => "Enter: Export | Esc: Back",
@@ -418,30 +418,62 @@ fn render_update(f: &mut Frame, area: Rect, app: &App) {
 
 /// Renders the delete password form
 fn render_delete(f: &mut Frame, area: Rect, app: &App) {
+    if app.password_list.is_empty() {
+        let empty_msg = Paragraph::new("No passwords stored yet.\nNothing to delete!")
+            .style(Style::default().fg(Color::Yellow))
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Delete Password"),
+            );
+        f.render_widget(empty_msg, area);
+        return;
+    }
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
+            Constraint::Min(8),
             Constraint::Length(5),
             Constraint::Length(3),
-            Constraint::Min(0),
         ])
         .margin(2)
         .split(area);
 
-    let app_name_input = Paragraph::new(app.app_name_input.value.as_str())
-        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+    // Password list for selection
+    let items: Vec<ListItem> = app
+        .password_list
+        .iter()
+        .enumerate()
+        .map(|(i, entry)| {
+            let style = if i == app.selected_list_item {
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            ListItem::new(format!("  {}  ", entry.app_name)).style(style)
+        })
+        .collect();
+
+    let list = List::new(items)
         .block(
             Block::default()
-                .title("Application Name to Delete")
-                .borders(Borders::ALL),
-        );
-    f.render_widget(app_name_input, chunks[0]);
+                .title("Select Application to Delete (↑↓ to navigate, Enter to confirm)")
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::White)),
+        )
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+
+    f.render_widget(list, chunks[0]);
 
     // Info section
     let info_text = "ℹ️  Delete Password\n\
-                     Permanently removes a password from the keyring.\n\
-                     Example: Enter 'oldapp' to delete its password.";
+                     Select an application and press Enter to delete.\n\
+                     Use ↑↓ to navigate, 'r' to refresh, Esc to cancel.";
     let info = Paragraph::new(info_text)
         .style(Style::default().fg(Color::Cyan))
         .block(Block::default().borders(Borders::ALL).title("Info"))
@@ -460,11 +492,6 @@ fn render_delete(f: &mut Frame, area: Rect, app: &App) {
             .block(Block::default().borders(Borders::ALL).title("Status"));
         f.render_widget(status, chunks[2]);
     }
-
-    // Set cursor position
-    let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
-    let cursor_y = chunks[0].y + 1;
-    f.set_cursor_position((cursor_x, cursor_y));
 }
 
 /// Renders the OTP generation form
