@@ -179,6 +179,10 @@ pub fn has_auto_passwords() -> bool {
                     if pw_type == "auto" {
                         return true;
                     }
+                } else {
+                    // No type metadata - could be auto or custom (legacy password)
+                    // Return true to enable the menu option (user can decide)
+                    return true;
                 }
             }
         }
@@ -204,6 +208,10 @@ pub fn has_custom_passwords() -> bool {
                     if pw_type == "custom" {
                         return true;
                     }
+                } else {
+                    // No type metadata - could be auto or custom (legacy password)
+                    // Return true to enable the menu option (user can decide)
+                    return true;
                 }
             }
         }

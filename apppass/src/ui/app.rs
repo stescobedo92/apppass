@@ -572,10 +572,8 @@ impl App {
                 self.app_name_input.insert_char(c);
             }
             KeyCode::Backspace => {
-                // Allow backspace even if field is empty (it just won't do anything)
-                if !self.app_name_input.value.is_empty() {
-                    self.app_name_input.delete_char();
-                }
+                // Always handle backspace (delete_char checks if cursor > 0)
+                self.app_name_input.delete_char();
             }
             KeyCode::Left => {
                 if !self.app_name_input.value.is_empty() {
@@ -664,13 +662,11 @@ impl App {
                 }
             }
             KeyCode::Backspace => {
-                // Allow backspace even if fields are empty (they just won't do anything)
-                if !self.app_name_input.value.is_empty() {
-                    if self.active_input == 0 {
-                        self.app_name_input.delete_char();
-                    } else {
-                        self.password_input.delete_char();
-                    }
+                // Always handle backspace (delete_char checks if cursor > 0)
+                if self.active_input == 0 {
+                    self.app_name_input.delete_char();
+                } else {
+                    self.password_input.delete_char();
                 }
             }
             KeyCode::Left => {
