@@ -568,7 +568,7 @@ impl App {
                 self.load_passwords();
                 self.status_message = "✓ List refreshed".to_string();
             }
-            KeyCode::Char(c) if !self.app_name_input.value.is_empty() => {
+            KeyCode::Char(c) => {
                 self.app_name_input.insert_char(c);
             }
             KeyCode::Backspace => {
@@ -654,7 +654,7 @@ impl App {
                 self.load_passwords();
                 self.status_message = "✓ List refreshed".to_string();
             }
-            KeyCode::Char(c) if !self.app_name_input.value.is_empty() => {
+            KeyCode::Char(c) => {
                 if self.active_input == 0 {
                     self.app_name_input.insert_char(c);
                 } else {

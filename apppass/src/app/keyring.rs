@@ -170,21 +170,24 @@ pub fn has_auto_passwords() -> bool {
     if let Ok(entry) = Entry::new(APP_SERVICE, APP_INDEX) {
         if let Ok(data) = entry.get_password() {
             let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
+            let mut has_auto = false;
+            let mut has_any_typed = false;
+            
             for app_name in app_names {
                 // Skip metadata entries
                 if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
                     continue;
                 }
                 if let Some(pw_type) = get_password_type(app_name) {
+                    has_any_typed = true;
                     if pw_type == "auto" {
-                        return true;
+                        has_auto = true;
                     }
-                } else {
-                    // No type metadata - could be auto or custom (legacy password)
-                    // Return true to enable the menu option (user can decide)
-                    return true;
                 }
             }
+            
+            // Return true if there are auto passwords, or if there are no typed passwords at all (all legacy)
+            return has_auto || !has_any_typed;
         }
     }
     false
@@ -199,21 +202,24 @@ pub fn has_custom_passwords() -> bool {
     if let Ok(entry) = Entry::new(APP_SERVICE, APP_INDEX) {
         if let Ok(data) = entry.get_password() {
             let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
+            let mut has_custom = false;
+            let mut has_any_typed = false;
+            
             for app_name in app_names {
                 // Skip metadata entries
                 if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
                     continue;
                 }
                 if let Some(pw_type) = get_password_type(app_name) {
+                    has_any_typed = true;
                     if pw_type == "custom" {
-                        return true;
+                        has_custom = true;
                     }
-                } else {
-                    // No type metadata - could be auto or custom (legacy password)
-                    // Return true to enable the menu option (user can decide)
-                    return true;
                 }
             }
+            
+            // Return true if there are custom passwords, or if there are no typed passwords at all (all legacy)
+            return has_custom || !has_any_typed;
         }
     }
     false
