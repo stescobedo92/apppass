@@ -12,6 +12,7 @@ use crate::app::keyring::{save_to_keyring, delete_from_keyring};
 ///
 /// * `app_name` - A string slice that holds the name of the application for the OTP.
 /// * `ttl_seconds` - The time-to-live for the OTP in seconds.
+/// * `length` - The length of the OTP to generate.
 ///
 /// # Returns
 ///
@@ -26,10 +27,10 @@ use crate::app::keyring::{save_to_keyring, delete_from_keyring};
 ///
 /// If the main program exits and is not restarted before the TTL expires, the OTP will still be
 /// automatically deleted by the background thread. The OS will clean up the thread after it completes.
-pub fn generate_otp(app_name: &str, ttl_seconds: u64) -> Result<String, String> {
+pub fn generate_otp(app_name: &str, ttl_seconds: u64, length: usize) -> Result<String, String> {
     let otp: String = thread_rng()
         .sample_iter(&Alphanumeric)
-        .take(10)
+        .take(length)
         .map(char::from)
         .collect();
 
@@ -64,13 +65,14 @@ mod tests {
     fn test_generate_otp() {
         let ttl_seconds = 2;
         let app_name = "TestOTPApp";
+        let length = 10;
         
         // Generate OTP
-        let result = generate_otp(app_name, ttl_seconds);
+        let result = generate_otp(app_name, ttl_seconds, length);
         assert!(result.is_ok());
         
         let otp = result.unwrap();
-        assert_eq!(otp.len(), 10);
+        assert_eq!(otp.len(), length);
         
         // Verify it's saved to keyring
         let retrieved = get_from_keyring(app_name);

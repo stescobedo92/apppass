@@ -105,7 +105,10 @@ fn render_settings(f: &mut Frame, area: Rect, app: &App) {
          Current: {} characters\n\
          Range: 8-128 characters\n\
          \n\
-         This affects: Create New Password, Generate Memorizable Password",
+         This setting is persistent and saved to keyring.\n\
+         It will be remembered across app restarts.\n\
+         \n\
+         Affects: Create New Password, Generate OTP, Generate Memorizable Password",
         app.default_password_length
     );
     let info = Paragraph::new(info_text)
@@ -600,16 +603,19 @@ fn render_generate_otp(f: &mut Frame, area: Rect, app: &App) {
         .style(ttl_style)
         .block(
             Block::default()
-                .title("TTL in seconds (default: 300)")
+                .title("TTL in seconds (default: 300 seconds = 5 minutes)")
                 .borders(Borders::ALL),
         );
     f.render_widget(ttl_input, chunks[1]);
 
     // Info section
-    let info_text = "ℹ️  Generate OTP (One-Time Password)\n\
-                     Creates a temporary password saved to keyring with automatic expiration.\n\
-                     The OTP will be automatically deleted from keyring after TTL expires.\n\
-                     Example: 'Gmail' with TTL '12' → password saved for 12 seconds, then auto-deleted.";
+    let info_text = format!(
+        "ℹ️  Generate OTP (One-Time Password)\n\
+         Creates a temporary {}-character password saved to keyring with automatic expiration.\n\
+         The OTP will be automatically deleted from keyring after TTL expires.\n\
+         Example: 'Gmail' with TTL '12' → password saved for 12 seconds, then auto-deleted.",
+        app.default_password_length
+    );
     let info = Paragraph::new(info_text)
         .style(Style::default().fg(Color::Cyan))
         .block(Block::default().borders(Borders::ALL).title("Info"))

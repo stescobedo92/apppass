@@ -167,7 +167,14 @@ fn main() {
             .get_one::<String>("ttl")
             .and_then(|t| t.parse::<u64>().ok())
             .unwrap_or(300);
-        match generate_otp(name, ttl) {
+        
+        // Load password length from keyring, default to 30
+        let password_length = crate::app::keyring::get_from_keyring("password_length")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(30);
+        
+        match generate_otp(name, ttl, password_length) {
             Ok(otp) => {
                 println!("OTP generated and saved for '{}'", name);
                 println!("Temporary Password: {}", otp);

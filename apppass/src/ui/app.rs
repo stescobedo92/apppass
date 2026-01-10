@@ -111,8 +111,13 @@ pub struct App {
 }
 
 impl App {
+    const PASSWORD_LENGTH_KEY: &'static str = "password_length";
+
     /// Creates a new App instance
     pub fn new() -> Self {
+        // Load default password length from keyring (persistent setting)
+        let default_password_length = Self::load_password_length_setting().unwrap_or(30);
+
         Self {
             mode: Mode::Menu,
             should_quit: false,
@@ -122,10 +127,30 @@ impl App {
             length_input: InputField::new(),
             password_list: Vec::new(),
             selected_list_item: 0,
-            default_password_length: 30,
+            default_password_length,
             status_message: String::new(),
             active_input: 0,
         }
+    }
+
+    /// Load password length setting from keyring
+    fn load_password_length_setting() -> Option<usize> {
+        match get_from_keyring(Self::PASSWORD_LENGTH_KEY) {
+            Ok(value) => value.parse::<usize>().ok(),
+            Err(_) => None,
+        }
+    }
+
+    /// Save password length setting to keyring
+    fn save_password_length_setting(length: usize) -> Result<(), String> {
+        save_to_keyring(Self::PASSWORD_LENGTH_KEY, &length.to_string())
+            .map_err(|e| format!("Failed to save setting: {}", e))
+    }
+
+    /// Delete password length setting from keyring
+    fn delete_password_length_setting() -> Result<(), String> {
+        delete_from_keyring(Self::PASSWORD_LENGTH_KEY)
+            .map_err(|e| format!("Failed to delete setting: {}", e))
     }
 
     /// Handles keyboard input
@@ -537,16 +562,18 @@ impl App {
             }
             KeyCode::Enter => {
                 if !self.app_name_input.value.is_empty() {
+                    // Parse TTL in seconds, default to 300 seconds (5 minutes) if not provided
                     let ttl = if !self.length_input.value.is_empty() {
                         self.length_input.value.parse::<u64>().unwrap_or(300)
                     } else {
                         300
                     };
                     
-                    match crate::app::otp::generate_otp(&self.app_name_input.value, ttl) {
+                    // Use the configured default password length for OTP
+                    match crate::app::otp::generate_otp(&self.app_name_input.value, ttl, self.default_password_length) {
                         Ok(otp) => {
                             self.status_message = format!(
-                                "✓ OTP saved for '{}' (expires in {}s): {}",
+                                "✓ OTP saved for '{}' (expires in {} seconds): {}",
                                 self.app_name_input.value, ttl, otp
                             );
                         }
@@ -720,7 +747,12 @@ impl App {
                 if let Ok(length) = self.length_input.value.parse::<usize>() {
                     if length >= 8 && length <= 128 {
                         self.default_password_length = length;
-                        self.status_message = format!("✓ Default password length set to {} characters", length);
+                        // Save to keyring for persistence
+                        if let Err(e) = Self::save_password_length_setting(length) {
+                            self.status_message = format!("✗ Failed to save setting: {}", e);
+                        } else {
+                            self.status_message = format!("✓ Default password length set to {} characters (saved)", length);
+                        }
                         self.mode = Mode::Menu;
                     } else {
                         self.status_message = "✗ Length must be between 8 and 128 characters".to_string();
