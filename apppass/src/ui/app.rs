@@ -571,14 +571,21 @@ impl App {
             KeyCode::Char(c) if !self.app_name_input.value.is_empty() => {
                 self.app_name_input.insert_char(c);
             }
-            KeyCode::Backspace if !self.app_name_input.value.is_empty() => {
-                self.app_name_input.delete_char();
+            KeyCode::Backspace => {
+                // Allow backspace even if field is empty (it just won't do anything)
+                if !self.app_name_input.value.is_empty() {
+                    self.app_name_input.delete_char();
+                }
             }
-            KeyCode::Left if !self.app_name_input.value.is_empty() => {
-                self.app_name_input.move_cursor_left();
+            KeyCode::Left => {
+                if !self.app_name_input.value.is_empty() {
+                    self.app_name_input.move_cursor_left();
+                }
             }
-            KeyCode::Right if !self.app_name_input.value.is_empty() => {
-                self.app_name_input.move_cursor_right();
+            KeyCode::Right => {
+                if !self.app_name_input.value.is_empty() {
+                    self.app_name_input.move_cursor_right();
+                }
             }
             _ => {}
         }
@@ -656,25 +663,32 @@ impl App {
                     self.password_input.insert_char(c);
                 }
             }
-            KeyCode::Backspace if !self.app_name_input.value.is_empty() => {
-                if self.active_input == 0 {
-                    self.app_name_input.delete_char();
-                } else {
-                    self.password_input.delete_char();
+            KeyCode::Backspace => {
+                // Allow backspace even if fields are empty (they just won't do anything)
+                if !self.app_name_input.value.is_empty() {
+                    if self.active_input == 0 {
+                        self.app_name_input.delete_char();
+                    } else {
+                        self.password_input.delete_char();
+                    }
                 }
             }
-            KeyCode::Left if !self.app_name_input.value.is_empty() => {
-                if self.active_input == 0 {
-                    self.app_name_input.move_cursor_left();
-                } else {
-                    self.password_input.move_cursor_left();
+            KeyCode::Left => {
+                if !self.app_name_input.value.is_empty() {
+                    if self.active_input == 0 {
+                        self.app_name_input.move_cursor_left();
+                    } else {
+                        self.password_input.move_cursor_left();
+                    }
                 }
             }
-            KeyCode::Right if !self.app_name_input.value.is_empty() => {
-                if self.active_input == 0 {
-                    self.app_name_input.move_cursor_right();
-                } else {
-                    self.password_input.move_cursor_right();
+            KeyCode::Right => {
+                if !self.app_name_input.value.is_empty() {
+                    if self.active_input == 0 {
+                        self.app_name_input.move_cursor_right();
+                    } else {
+                        self.password_input.move_cursor_right();
+                    }
                 }
             }
             _ => {}
