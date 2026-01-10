@@ -24,7 +24,8 @@ pub fn render(f: &mut Frame, app: &App) {
         Mode::Create => render_create(f, chunks[1], app),
         Mode::CreateCustom => render_create_custom(f, chunks[1], app),
         Mode::List => render_list(f, chunks[1], app),
-        Mode::Update => render_update(f, chunks[1], app),
+        Mode::UpdateAuto => render_update_auto(f, chunks[1], app),
+        Mode::UpdateCustom => render_update_custom(f, chunks[1], app),
         Mode::Delete => render_delete(f, chunks[1], app),
         Mode::View => render_view(f, chunks[1], app),
         Mode::GenerateOTP => render_generate_otp(f, chunks[1], app),
@@ -58,7 +59,8 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
         Mode::CreateCustom => "Tab: Switch Field | Enter: Create | Esc: Back",
         Mode::List => "↑↓: Navigate | Enter: View | r: Refresh | Esc: Back",
         Mode::View => "Enter/Esc: Back",
-        Mode::Update => "Tab: Switch Field | Enter: Update | Esc: Back",
+        Mode::UpdateAuto => "↑↓: Navigate | Enter: Select/Save | r: Refresh | Esc: Back",
+        Mode::UpdateCustom => "↑↓: Navigate | Enter: Select | Tab: Switch Field | Esc: Back",
         Mode::Delete => "↑↓: Navigate | Enter: Delete | r: Refresh | Esc: Back",
         Mode::GenerateOTP => "Tab: Switch Field | Enter: Generate | Esc: Back",
         Mode::Memorizable => "Enter: Generate | Esc: Back",
@@ -138,34 +140,51 @@ fn render_settings(f: &mut Frame, area: Rect, app: &App) {
 
 /// Renders the main menu
 fn render_menu(f: &mut Frame, area: Rect, app: &App) {
+    let has_passwords = app.has_passwords();
+    
     let menu_items = vec![
-        "Create New Password (Auto-generated)",
-        "Create Custom Password",
-        "List All Passwords",
-        "Update Password",
-        "Delete Password",
-        "Generate OTP (One-Time Password)",
-        "Generate Memorizable Password",
-        "Export Passwords to CSV",
-        "Import Passwords from CSV",
-        "Settings (Password Length)",
-        "Set Auto-Lock",
-        "Exit",
+        ("Create New Password (Auto-generated)", true),
+        ("Create Custom Password", true),
+        ("List All Passwords", true),
+        ("Update Auto-generated Password", has_passwords),
+        ("Update Custom Password", has_passwords),
+        ("Delete Password", has_passwords),
+        ("Generate OTP (One-Time Password)", true),
+        ("Generate Memorizable Password", true),
+        ("Export Passwords to CSV", true),
+        ("Import Passwords from CSV", true),
+        ("Settings (Password Length)", true),
+        ("Set Auto-Lock", true),
+        ("Exit", true),
     ];
 
     let items: Vec<ListItem> = menu_items
         .iter()
         .enumerate()
-        .map(|(i, &item)| {
-            let style = if i == app.selected_menu {
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
+        .map(|(i, (item, enabled))| {
+            let text = if *enabled {
+                format!("  {}  ", item)
             } else {
-                Style::default().fg(Color::White)
+                format!("  {} (No passwords)  ", item)
             };
-            ListItem::new(format!("  {}  ", item)).style(style)
+            
+            let style = if i == app.selected_menu {
+                if *enabled {
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .bg(Color::Gray)
+                }
+            } else if *enabled {
+                Style::default().fg(Color::White)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
+            ListItem::new(text).style(style)
         })
         .collect();
 
@@ -404,60 +423,88 @@ fn render_view(f: &mut Frame, area: Rect, app: &App) {
 }
 
 /// Renders the update password form
-fn render_update(f: &mut Frame, area: Rect, app: &App) {
+/// Renders the update auto-generated password form (list selection + name change)
+fn render_update_auto(f: &mut Frame, area: Rect, app: &App) {
+    if app.password_list.is_empty() {
+        let empty_msg = Paragraph::new("No passwords stored yet.\nCreate some passwords first!")
+            .style(Style::default().fg(Color::Yellow))
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Update Auto-generated Password"),
+            );
+        f.render_widget(empty_msg, area);
+        return;
+    }
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
-            Constraint::Length(3),
+            Constraint::Min(5),
             Constraint::Length(5),
             Constraint::Length(3),
-            Constraint::Min(0),
         ])
         .margin(2)
         .split(area);
 
-    // App name input
-    let app_name_style = if app.active_input == 0 {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    // If editing app name, show input field
+    if !app.app_name_input.value.is_empty() {
+        let app_name_input = Paragraph::new(app.app_name_input.value.as_str())
+            .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+            .block(
+                Block::default()
+                    .title("Edit Application Name")
+                    .borders(Borders::ALL),
+            );
+        f.render_widget(app_name_input, chunks[0]);
+        
+        let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
+        let cursor_y = chunks[0].y + 1;
+        f.set_cursor_position((cursor_x, cursor_y));
     } else {
-        Style::default().fg(Color::White)
-    };
-    
-    let app_name_input = Paragraph::new(app.app_name_input.value.as_str())
-        .style(app_name_style)
-        .block(
-            Block::default()
-                .title("Application Name")
-                .borders(Borders::ALL),
-        );
-    f.render_widget(app_name_input, chunks[0]);
+        // Show list for selection
+        let items: Vec<ListItem> = app
+            .password_list
+            .iter()
+            .enumerate()
+            .map(|(i, entry)| {
+                let content = format!("  {}  ", entry.app_name);
+                let style = if i == app.selected_list_item {
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                ListItem::new(content).style(style)
+            })
+            .collect();
 
-    // Password input
-    let password_style = if app.active_input == 1 {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(Color::White)
-    };
-    
-    let password_input = Paragraph::new(app.password_input.value.as_str())
-        .style(password_style)
-        .block(
-            Block::default()
-                .title("New Password")
-                .borders(Borders::ALL),
-        );
-    f.render_widget(password_input, chunks[1]);
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .title(format!("Select Password to Update ({} total)", app.password_list.len()))
+                    .borders(Borders::ALL),
+            )
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+
+        f.render_widget(list, chunks[0]);
+    }
 
     // Info section
-    let info_text = "ℹ️  Update Password\n\
-                     Updates the password for an existing application.\n\
-                     Example: Enter 'gmail' and the new password to update.";
+    let info_text = format!(
+        "ℹ️  Update Auto-generated Password\n\
+        Select an application, change its name if needed, and a new {}-character password will be generated.\n\
+        Example: Select 'gmail', press Enter, change name to 'gmail-work', press Enter again.",
+        app.default_password_length
+    );
     let info = Paragraph::new(info_text)
         .style(Style::default().fg(Color::Cyan))
         .block(Block::default().borders(Borders::ALL).title("Info"))
         .wrap(Wrap { trim: false });
-    f.render_widget(info, chunks[2]);
+    f.render_widget(info, chunks[1]);
 
     // Status message
     if !app.status_message.is_empty() {
@@ -469,18 +516,165 @@ fn render_update(f: &mut Frame, area: Rect, app: &App) {
         let status = Paragraph::new(app.status_message.as_str())
             .style(Style::default().fg(status_color))
             .block(Block::default().borders(Borders::ALL).title("Status"));
-        f.render_widget(status, chunks[3]);
+        f.render_widget(status, chunks[2]);
+    }
+}
+
+/// Renders the update custom password form (list selection + name and/or password change)
+fn render_update_custom(f: &mut Frame, area: Rect, app: &App) {
+    if app.password_list.is_empty() {
+        let empty_msg = Paragraph::new("No passwords stored yet.\nCreate some passwords first!")
+            .style(Style::default().fg(Color::Yellow))
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Update Custom Password"),
+            );
+        f.render_widget(empty_msg, area);
+        return;
     }
 
-    // Set cursor position
-    if app.active_input == 0 {
-        let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
-        let cursor_y = chunks[0].y + 1;
-        f.set_cursor_position((cursor_x, cursor_y));
+    // If editing, show input fields
+    if !app.app_name_input.value.is_empty() {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),
+                Constraint::Length(3),
+                Constraint::Length(5),
+                Constraint::Length(3),
+            ])
+            .margin(2)
+            .split(area);
+
+        // App name input
+        let app_name_style = if app.active_input == 0 {
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        
+        let app_name_input = Paragraph::new(app.app_name_input.value.as_str())
+            .style(app_name_style)
+            .block(
+                Block::default()
+                    .title("Application Name")
+                    .borders(Borders::ALL),
+            );
+        f.render_widget(app_name_input, chunks[0]);
+
+        // Password input
+        let password_style = if app.active_input == 1 {
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        
+        let password_input = Paragraph::new(app.password_input.value.as_str())
+            .style(password_style)
+            .block(
+                Block::default()
+                    .title("Password")
+                    .borders(Borders::ALL),
+            );
+        f.render_widget(password_input, chunks[1]);
+
+        // Info section
+        let info_text = "ℹ️  Update Custom Password\n\
+                         Edit the application name and/or password, then press Enter to save.\n\
+                         Example: Change 'gmail' to 'gmail-work' or update the password value.";
+        let info = Paragraph::new(info_text)
+            .style(Style::default().fg(Color::Cyan))
+            .block(Block::default().borders(Borders::ALL).title("Info"))
+            .wrap(Wrap { trim: false });
+        f.render_widget(info, chunks[2]);
+
+        // Status message
+        if !app.status_message.is_empty() {
+            let status_color = if app.status_message.starts_with('✓') {
+                Color::Green
+            } else {
+                Color::Red
+            };
+            let status = Paragraph::new(app.status_message.as_str())
+                .style(Style::default().fg(status_color))
+                .block(Block::default().borders(Borders::ALL).title("Status"));
+            f.render_widget(status, chunks[3]);
+        }
+
+        // Set cursor position
+        if app.active_input == 0 {
+            let cursor_x = chunks[0].x + (app.app_name_input.cursor_position as u16).min(chunks[0].width.saturating_sub(2)) + 1;
+            let cursor_y = chunks[0].y + 1;
+            f.set_cursor_position((cursor_x, cursor_y));
+        } else {
+            let cursor_x = chunks[1].x + (app.password_input.cursor_position as u16).min(chunks[1].width.saturating_sub(2)) + 1;
+            let cursor_y = chunks[1].y + 1;
+            f.set_cursor_position((cursor_x, cursor_y));
+        }
     } else {
-        let cursor_x = chunks[1].x + (app.password_input.cursor_position as u16).min(chunks[1].width.saturating_sub(2)) + 1;
-        let cursor_y = chunks[1].y + 1;
-        f.set_cursor_position((cursor_x, cursor_y));
+        // Show list for selection
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(5),
+                Constraint::Length(5),
+                Constraint::Length(3),
+            ])
+            .margin(2)
+            .split(area);
+
+        let items: Vec<ListItem> = app
+            .password_list
+            .iter()
+            .enumerate()
+            .map(|(i, entry)| {
+                let content = format!("  {}  ", entry.app_name);
+                let style = if i == app.selected_list_item {
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                ListItem::new(content).style(style)
+            })
+            .collect();
+
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .title(format!("Select Password to Update ({} total)", app.password_list.len()))
+                    .borders(Borders::ALL),
+            )
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+
+        f.render_widget(list, chunks[0]);
+
+        // Info section
+        let info_text = "ℹ️  Update Custom Password\n\
+                         Select an application to edit both its name and password.\n\
+                         Example: Select 'gmail', then edit the name and/or password values.";
+        let info = Paragraph::new(info_text)
+            .style(Style::default().fg(Color::Cyan))
+            .block(Block::default().borders(Borders::ALL).title("Info"))
+            .wrap(Wrap { trim: false });
+        f.render_widget(info, chunks[1]);
+
+        // Status message
+        if !app.status_message.is_empty() {
+            let status_color = if app.status_message.starts_with('✓') {
+                Color::Green
+            } else {
+                Color::Red
+            };
+            let status = Paragraph::new(app.status_message.as_str())
+                .style(Style::default().fg(status_color))
+                .block(Block::default().borders(Borders::ALL).title("Status"));
+            f.render_widget(status, chunks[2]);
+        }
     }
 }
 
