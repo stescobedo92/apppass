@@ -543,11 +543,17 @@ impl App {
                         300
                     };
                     
-                    crate::app::otp::generate_otp(&self.app_name_input.value, ttl);
-                    self.status_message = format!(
-                        "✓ OTP generated for '{}' (TTL: {}s)",
-                        self.app_name_input.value, ttl
-                    );
+                    match crate::app::otp::generate_otp(&self.app_name_input.value, ttl) {
+                        Ok(otp) => {
+                            self.status_message = format!(
+                                "✓ OTP saved for '{}' (expires in {}s): {}",
+                                self.app_name_input.value, ttl, otp
+                            );
+                        }
+                        Err(e) => {
+                            self.status_message = format!("✗ Error: {}", e);
+                        }
+                    }
                     self.app_name_input.clear();
                     self.length_input.clear();
                     self.active_input = 0;

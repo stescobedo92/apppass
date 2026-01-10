@@ -607,8 +607,9 @@ fn render_generate_otp(f: &mut Frame, area: Rect, app: &App) {
 
     // Info section
     let info_text = "ℹ️  Generate OTP (One-Time Password)\n\
-                     Creates a temporary password that expires after the specified time.\n\
-                     Example: Enter 'MyApp' and TTL '300' for a 5-minute password.";
+                     Creates a temporary password saved to keyring with automatic expiration.\n\
+                     The OTP will be automatically deleted from keyring after TTL expires.\n\
+                     Example: 'Gmail' with TTL '12' → password saved for 12 seconds, then auto-deleted.";
     let info = Paragraph::new(info_text)
         .style(Style::default().fg(Color::Cyan))
         .block(Block::default().borders(Borders::ALL).title("Info"))

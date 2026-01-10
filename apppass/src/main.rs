@@ -167,7 +167,15 @@ fn main() {
             .get_one::<String>("ttl")
             .and_then(|t| t.parse::<u64>().ok())
             .unwrap_or(300);
-        generate_otp(name, ttl);
+        match generate_otp(name, ttl) {
+            Ok(otp) => {
+                println!("OTP generated and saved for '{}'", name);
+                println!("Temporary Password: {}", otp);
+                println!("Expires in: {} seconds", ttl);
+                println!("\nThis password will be automatically deleted from the keyring after {} seconds.", ttl);
+            }
+            Err(e) => eprintln!("Failed to generate OTP: {}", e),
+        }
     }
 
     if let Some(name) = apppass.get_one::<String>("memorizable") {
