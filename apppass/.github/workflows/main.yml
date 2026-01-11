@@ -69,6 +69,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Update Version from Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Updating Cargo.toml version to $VERSION"
+          sed -i.bak "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          rm -f Cargo.toml.bak
+          cat Cargo.toml | head -5
+
       - name: Install Dependencies
         shell: bash
         run: |
