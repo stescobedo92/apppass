@@ -1,4 +1,4 @@
-use crate::app::keyring::{delete_from_keyring, get_from_keyring, save_to_keyring, set_password_type, has_auto_passwords, has_custom_passwords};
+use crate::app::keyring::{delete_from_keyring, get_from_keyring, save_to_keyring, set_password_type, has_auto_passwords, has_custom_passwords, get_password_type, cleanup_orphaned_index};
 use crossterm::event::{KeyCode, KeyEvent};
 use keyring::Entry;
 use std::io;
@@ -84,6 +84,8 @@ impl InputField {
 pub struct PasswordEntry {
     pub app_name: String,
     pub password: String,
+    #[allow(dead_code)]
+    pub password_type: String, // "auto" or "custom"
 }
 
 /// Main application state
@@ -110,11 +112,19 @@ pub struct App {
     pub active_input: usize,
     /// Default password length for auto-generation
     pub default_password_length: usize,
+    /// Whether we are in editing mode (for Update screens)
+    pub is_editing: bool,
 }
 
 impl App {
     /// Creates a new App instance
     pub fn new() -> Self {
+        // Clean up orphaned index at startup
+        cleanup_orphaned_index();
+        
+        // Clean up expired OTPs at startup
+        crate::app::otp::cleanup_expired_otps();
+        
         // Load default password length from keyring (persistent setting)
         let default_password_length = Self::load_password_length_setting().unwrap_or(30);
 
@@ -130,6 +140,7 @@ impl App {
             default_password_length,
             status_message: String::new(),
             active_input: 0,
+            is_editing: false,
         }
     }
 
@@ -199,6 +210,8 @@ impl App {
             KeyCode::Enter => {
                 self.status_message.clear();
                 let has_passwords = self.has_passwords();
+                let has_auto = has_auto_passwords();
+                let has_custom = has_custom_passwords();
                 
                 match self.selected_menu {
                     0 => {
@@ -217,30 +230,36 @@ impl App {
                     }
                     2 => {
                         // List All Passwords
+                        if !has_passwords {
+                            self.status_message = "✗ No passwords to list".to_string();
+                            return Ok(());
+                        }
                         self.mode = Mode::List;
                         self.load_passwords();
                     }
                     3 => {
                         // Update Auto-generated Password
-                        if !has_passwords {
-                            self.status_message = "✗ No passwords to update".to_string();
+                        if !has_auto {
+                            self.status_message = "✗ No auto-generated passwords to update".to_string();
                             return Ok(());
                         }
                         self.mode = Mode::UpdateAuto;
                         self.app_name_input.clear();
-                        self.load_passwords();  // Load passwords for selection
+                        self.is_editing = false;
+                        self.load_passwords_by_type("auto");  // Load only auto passwords
                         self.selected_list_item = 0;
                     }
                     4 => {
                         // Update Custom Password
-                        if !has_passwords {
-                            self.status_message = "✗ No passwords to update".to_string();
+                        if !has_custom {
+                            self.status_message = "✗ No custom passwords to update".to_string();
                             return Ok(());
                         }
                         self.mode = Mode::UpdateCustom;
                         self.app_name_input.clear();
                         self.password_input.clear();
-                        self.load_passwords();  // Load passwords for selection
+                        self.is_editing = false;
+                        self.load_passwords_by_type("custom");  // Load only custom passwords
                         self.selected_list_item = 0;
                         self.active_input = 0;
                     }
@@ -421,14 +440,18 @@ impl App {
             if let Ok(data) = entry.get_password() {
                 let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
                 for app_name in app_names {
-                    // Skip password_length and _type metadata - they're settings/metadata, not real passwords
-                    if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
+                    // Skip password_length, _type metadata, and internal index - they're settings/metadata, not real passwords
+                    if app_name == crate::app::PASSWORD_LENGTH_KEY 
+                        || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+                        || app_name == crate::app::APP_INDEX {
                         continue;
                     }
                     if let Ok(password) = get_from_keyring(app_name) {
+                        let pw_type = get_password_type(app_name).unwrap_or_else(|| "auto".to_string());
                         self.password_list.push(PasswordEntry {
                             app_name: app_name.to_string(),
                             password,
+                            password_type: pw_type,
                         });
                     }
                 }
@@ -440,14 +463,50 @@ impl App {
         }
     }
 
-    /// Check if there are any real passwords (excluding password_length setting and _type metadata)
+    /// Loads passwords filtered by type ("auto" or "custom")
+    fn load_passwords_by_type(&mut self, filter_type: &str) {
+        self.password_list.clear();
+        self.selected_list_item = 0;
+
+        if let Ok(entry) = Entry::new(crate::app::APP_SERVICE, crate::app::APP_INDEX) {
+            if let Ok(data) = entry.get_password() {
+                let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
+                for app_name in app_names {
+                    // Skip password_length, _type metadata, and internal index
+                    if app_name == crate::app::PASSWORD_LENGTH_KEY 
+                        || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+                        || app_name == crate::app::APP_INDEX {
+                        continue;
+                    }
+                    if let Ok(password) = get_from_keyring(app_name) {
+                        let pw_type = get_password_type(app_name).unwrap_or_else(|| "auto".to_string());
+                        // Filter by type
+                        if pw_type == filter_type {
+                            self.password_list.push(PasswordEntry {
+                                app_name: app_name.to_string(),
+                                password,
+                                password_type: pw_type,
+                            });
+                        }
+                    }
+                }
+            } else {
+                self.status_message = format!("No {} passwords found", filter_type);
+            }
+        } else {
+            self.status_message = "Failed to access keyring".to_string();
+        }
+    }
+
+    /// Check if there are any real passwords (excluding password_length setting, _type metadata, and internal index)
     pub fn has_passwords(&self) -> bool {
         if let Ok(entry) = Entry::new(crate::app::APP_SERVICE, crate::app::APP_INDEX) {
             if let Ok(data) = entry.get_password() {
                 let app_names: Vec<&str> = data.split(',')
                     .filter(|s| !s.is_empty() 
                         && *s != crate::app::PASSWORD_LENGTH_KEY
-                        && !s.ends_with(crate::app::PASSWORD_TYPE_SUFFIX))
+                        && !s.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+                        && *s != crate::app::APP_INDEX)
                     .collect();
                 return !app_names.is_empty();
             }
@@ -505,15 +564,22 @@ impl App {
     fn handle_update_auto_key(&mut self, key: KeyEvent) -> io::Result<()> {
         match key.code {
             KeyCode::Esc => {
-                self.mode = Mode::Menu;
+                if self.is_editing {
+                    // Cancel editing, return to list selection
+                    self.is_editing = false;
+                    self.app_name_input.clear();
+                    self.status_message = "Editing cancelled".to_string();
+                } else {
+                    self.mode = Mode::Menu;
+                }
             }
             KeyCode::Up => {
-                if self.selected_list_item > 0 {
+                if !self.is_editing && self.selected_list_item > 0 {
                     self.selected_list_item -= 1;
                 }
             }
             KeyCode::Down => {
-                if self.selected_list_item < self.password_list.len().saturating_sub(1) {
+                if !self.is_editing && self.selected_list_item < self.password_list.len().saturating_sub(1) {
                     self.selected_list_item += 1;
                 }
             }
@@ -521,15 +587,20 @@ impl App {
                 if !self.password_list.is_empty() && self.selected_list_item < self.password_list.len() {
                     let old_app_name = self.password_list[self.selected_list_item].app_name.clone();
                     
-                    // Ask for new app name (or keep current)
-                    if self.app_name_input.value.is_empty() {
+                    if !self.is_editing {
                         // First Enter: start editing app name
+                        self.is_editing = true;
                         self.app_name_input.value = old_app_name.clone();
                         self.app_name_input.cursor_position = self.app_name_input.value.len();
                         self.status_message = "Edit app name and press Enter to save (or Esc to cancel)".to_string();
                     } else {
                         // Second Enter: save with new app name
                         let new_app_name = self.app_name_input.value.clone();
+                        
+                        if new_app_name.is_empty() {
+                            self.status_message = "✗ App name cannot be empty".to_string();
+                            return Ok(());
+                        }
                         
                         // Generate new password with current default length
                         use rand::distributions::Alphanumeric;
@@ -548,13 +619,16 @@ impl App {
                         // Save with new name and new password
                         match save_to_keyring(&new_app_name, &new_password) {
                             Ok(_) => {
+                                // Mark as auto-generated
+                                let _ = set_password_type(&new_app_name, "auto");
                                 self.status_message = format!(
                                     "✓ Password updated for '{}' (regenerated with {} chars)",
                                     new_app_name,
                                     self.default_password_length
                                 );
+                                self.is_editing = false;
                                 self.app_name_input.clear();
-                                self.load_passwords();  // Reload the list
+                                self.load_passwords_by_type("auto");  // Reload only auto passwords
                                 self.selected_list_item = 0;
                             }
                             Err(e) => {
@@ -565,23 +639,30 @@ impl App {
                 }
             }
             KeyCode::Char('r') => {
-                self.load_passwords();
-                self.status_message = "✓ List refreshed".to_string();
+                if !self.is_editing {
+                    self.load_passwords_by_type("auto");
+                    self.status_message = "✓ Auto passwords list refreshed".to_string();
+                } else {
+                    self.app_name_input.insert_char('r');
+                }
             }
             KeyCode::Char(c) => {
-                self.app_name_input.insert_char(c);
+                if self.is_editing {
+                    self.app_name_input.insert_char(c);
+                }
             }
             KeyCode::Backspace => {
-                // Always handle backspace (delete_char checks if cursor > 0)
-                self.app_name_input.delete_char();
+                if self.is_editing {
+                    self.app_name_input.delete_char();
+                }
             }
             KeyCode::Left => {
-                if !self.app_name_input.value.is_empty() {
+                if self.is_editing {
                     self.app_name_input.move_cursor_left();
                 }
             }
             KeyCode::Right => {
-                if !self.app_name_input.value.is_empty() {
+                if self.is_editing {
                     self.app_name_input.move_cursor_right();
                 }
             }
@@ -594,83 +675,117 @@ impl App {
     fn handle_update_custom_key(&mut self, key: KeyEvent) -> io::Result<()> {
         match key.code {
             KeyCode::Esc => {
-                self.mode = Mode::Menu;
-                self.app_name_input.clear();
-                self.password_input.clear();
-                self.active_input = 0;
+                if self.is_editing {
+                    // Cancel editing, return to list selection
+                    self.is_editing = false;
+                    self.app_name_input.clear();
+                    self.password_input.clear();
+                    self.active_input = 0;
+                    self.status_message = "Editing cancelled".to_string();
+                } else {
+                    self.mode = Mode::Menu;
+                }
             }
-            KeyCode::Up if self.app_name_input.value.is_empty() && self.password_input.value.is_empty() => {
-                if self.selected_list_item > 0 {
+            KeyCode::Up => {
+                if !self.is_editing && self.selected_list_item > 0 {
                     self.selected_list_item -= 1;
                 }
             }
-            KeyCode::Down if self.app_name_input.value.is_empty() && self.password_input.value.is_empty() => {
-                if self.selected_list_item < self.password_list.len().saturating_sub(1) {
+            KeyCode::Down => {
+                if !self.is_editing && self.selected_list_item < self.password_list.len().saturating_sub(1) {
                     self.selected_list_item += 1;
                 }
             }
-            KeyCode::Enter if self.app_name_input.value.is_empty() && self.password_input.value.is_empty() => {
-                // First Enter: Load selected password for editing
-                if !self.password_list.is_empty() && self.selected_list_item < self.password_list.len() {
-                    let entry = &self.password_list[self.selected_list_item];
-                    self.app_name_input.value = entry.app_name.clone();
-                    self.app_name_input.cursor_position = self.app_name_input.value.len();
-                    self.password_input.value = entry.password.clone();
-                    self.password_input.cursor_position = self.password_input.value.len();
-                    self.active_input = 0;
-                    self.status_message = "Edit app name/password, press Enter to save (Tab to switch fields, Esc to cancel)".to_string();
+            KeyCode::Tab => {
+                if self.is_editing {
+                    self.active_input = (self.active_input + 1) % 2;
                 }
             }
-            KeyCode::Tab if !self.app_name_input.value.is_empty() => {
-                self.active_input = (self.active_input + 1) % 2;
-            }
-            KeyCode::Enter if !self.app_name_input.value.is_empty() && !self.password_input.value.is_empty() => {
-                // Save changes
-                let old_app_name = self.password_list[self.selected_list_item].app_name.clone();
-                let new_app_name = self.app_name_input.value.clone();
-                let new_password = self.password_input.value.clone();
-                
-                // If name changed, delete old entry
-                if new_app_name != old_app_name {
-                    let _ = delete_from_keyring(&old_app_name);
-                }
-                
-                // Save with new values
-                match save_to_keyring(&new_app_name, &new_password) {
-                    Ok(_) => {
-                        self.status_message = format!("✓ Password updated for '{}'", new_app_name);
-                        self.app_name_input.clear();
-                        self.password_input.clear();
+            KeyCode::Enter => {
+                if !self.is_editing {
+                    // First Enter: Load selected password for editing
+                    if !self.password_list.is_empty() && self.selected_list_item < self.password_list.len() {
+                        let entry = &self.password_list[self.selected_list_item];
+                        self.is_editing = true;
+                        self.app_name_input.value = entry.app_name.clone();
+                        self.app_name_input.cursor_position = self.app_name_input.value.len();
+                        self.password_input.value = entry.password.clone();
+                        self.password_input.cursor_position = self.password_input.value.len();
                         self.active_input = 0;
-                        self.load_passwords();  // Reload the list
-                        self.selected_list_item = 0;
+                        self.status_message = "Edit app name/password, press Enter to save (Tab to switch fields, Esc to cancel)".to_string();
                     }
-                    Err(e) => {
-                        self.status_message = format!("✗ Error: {}", e);
+                } else {
+                    // Validate inputs
+                    if self.app_name_input.value.is_empty() {
+                        self.status_message = "✗ App name cannot be empty".to_string();
+                        return Ok(());
+                    }
+                    if self.password_input.value.is_empty() {
+                        self.status_message = "✗ Password cannot be empty".to_string();
+                        return Ok(());
+                    }
+                    
+                    // Save changes
+                    let old_app_name = self.password_list[self.selected_list_item].app_name.clone();
+                    let new_app_name = self.app_name_input.value.clone();
+                    let new_password = self.password_input.value.clone();
+                    
+                    // If name changed, delete old entry
+                    if new_app_name != old_app_name {
+                        let _ = delete_from_keyring(&old_app_name);
+                    }
+                    
+                    // Save with new values
+                    match save_to_keyring(&new_app_name, &new_password) {
+                        Ok(_) => {
+                            // Mark as custom password
+                            let _ = set_password_type(&new_app_name, "custom");
+                            self.status_message = format!("✓ Custom password updated for '{}'", new_app_name);
+                            self.is_editing = false;
+                            self.app_name_input.clear();
+                            self.password_input.clear();
+                            self.active_input = 0;
+                            self.load_passwords_by_type("custom");  // Reload only custom passwords
+                            self.selected_list_item = 0;
+                        }
+                        Err(e) => {
+                            self.status_message = format!("✗ Error: {}", e);
+                        }
                     }
                 }
             }
-            KeyCode::Char('r') if self.app_name_input.value.is_empty() => {
-                self.load_passwords();
-                self.status_message = "✓ List refreshed".to_string();
+            KeyCode::Char('r') => {
+                if !self.is_editing {
+                    self.load_passwords_by_type("custom");
+                    self.status_message = "✓ Custom passwords list refreshed".to_string();
+                } else {
+                    if self.active_input == 0 {
+                        self.app_name_input.insert_char('r');
+                    } else {
+                        self.password_input.insert_char('r');
+                    }
+                }
             }
             KeyCode::Char(c) => {
-                if self.active_input == 0 {
-                    self.app_name_input.insert_char(c);
-                } else {
-                    self.password_input.insert_char(c);
+                if self.is_editing {
+                    if self.active_input == 0 {
+                        self.app_name_input.insert_char(c);
+                    } else {
+                        self.password_input.insert_char(c);
+                    }
                 }
             }
             KeyCode::Backspace => {
-                // Always handle backspace (delete_char checks if cursor > 0)
-                if self.active_input == 0 {
-                    self.app_name_input.delete_char();
-                } else {
-                    self.password_input.delete_char();
+                if self.is_editing {
+                    if self.active_input == 0 {
+                        self.app_name_input.delete_char();
+                    } else {
+                        self.password_input.delete_char();
+                    }
                 }
             }
             KeyCode::Left => {
-                if !self.app_name_input.value.is_empty() {
+                if self.is_editing {
                     if self.active_input == 0 {
                         self.app_name_input.move_cursor_left();
                     } else {
@@ -679,7 +794,7 @@ impl App {
                 }
             }
             KeyCode::Right => {
-                if !self.app_name_input.value.is_empty() {
+                if self.is_editing {
                     if self.active_input == 0 {
                         self.app_name_input.move_cursor_right();
                     } else {
