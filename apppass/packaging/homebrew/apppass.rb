@@ -2,7 +2,7 @@ class Apppass < Formula
   desc "Generate secure passwords for your applications."
   homepage "https://github.com/stescobedo92/apppass"
   url "https://github.com/stescobedo92/apppass/archive/refs/tags/v1.0.1.tar.gz"
-  sha256 "sha256:11915381500f2c0adc3b9a893027eb90cc37598fd2e639dec5d5921a8e7d9df5"
+  sha256 "11915381500f2c0adc3b9a893027eb90cc37598fd2e639dec5d5921a8e7d9df5"
   license "MIT"
 
   depends_on "rust" => :build
