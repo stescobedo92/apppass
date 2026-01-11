@@ -447,31 +447,60 @@ mod tests {
     #[test]
     fn test_export_import_passwords_roundtrip() {
         skip_if_no_keyring!();
-        let app_name = "test_export_import_app";
-        let test_file = "test_export_temp.csv";
-        cleanup_test_password(app_name);
+        // Use unique name to avoid conflicts with other tests
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let app_name = format!("test_export_import_app_{}", nanos);
+        let test_file = format!("test_export_temp_{}.csv", nanos);
+        let test_password = "export_test_pwd";
+        
+        cleanup_test_password(&app_name);
+        std::thread::sleep(std::time::Duration::from_millis(50));
         
         // Create a password
-        save_to_keyring(app_name, "export_test_pwd").unwrap();
+        let save_result = save_to_keyring(&app_name, test_password);
+        assert!(save_result.is_ok(), "Failed to save password: {:?}", save_result);
+        
+        // Small delay to ensure keyring is updated
+        std::thread::sleep(std::time::Duration::from_millis(50));
         
         // Export
-        let export_result = export_passwords(test_file);
-        assert!(export_result.is_ok());
+        let export_result = export_passwords(&test_file);
+        assert!(export_result.is_ok(), "Failed to export passwords: {:?}", export_result);
         
         // Delete original
-        delete_password(app_name).unwrap();
+        let delete_result = delete_password(&app_name);
+        assert!(delete_result.is_ok(), "Failed to delete password: {:?}", delete_result);
+        
+        // Small delay to ensure deletion is complete
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        
+        // Verify password was deleted
+        let check_deleted = get_from_keyring(&app_name);
+        assert!(check_deleted.is_err(), "Password should be deleted before import");
         
         // Import
-        let import_result = import_passwords(test_file);
-        assert!(import_result.is_ok());
+        let import_result = import_passwords(&test_file);
+        assert!(import_result.is_ok(), "Failed to import passwords: {:?}", import_result);
         
-        // Verify imported
-        let retrieved = get_from_keyring(app_name);
-        assert!(retrieved.is_ok());
-        assert_eq!(retrieved.unwrap(), "export_test_pwd");
+        // Small delay to ensure import is complete
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        
+        // Verify imported with retry logic
+        let mut retrieved_ok = false;
+        for _ in 0..5 {
+            let retrieved = get_from_keyring(&app_name);
+            if retrieved.is_ok() {
+                assert_eq!(retrieved.unwrap(), test_password);
+                retrieved_ok = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        assert!(retrieved_ok, "Failed to retrieve imported password after multiple attempts");
         
         // Cleanup
-        cleanup_test_password(app_name);
-        let _ = std::fs::remove_file(test_file);
+        cleanup_test_password(&app_name);
+        let _ = std::fs::remove_file(&test_file);
     }
 }
