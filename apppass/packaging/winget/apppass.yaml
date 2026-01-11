@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.singleton.1.6.0.schema.json
+
+PackageIdentifier: stescobedo92.apppass
+PackageVersion: 1.0.1
+PackageName: apppass
+Publisher: stescobedo92
+License: MIT
+ShortDescription: Generate secure passwords for your applications.
+Description: |
+  apppass is a powerful command-line application to generate and manage secure passwords.
+  It includes both a CLI console interface and an interactive TUI.
+  Available features:
+  - console: Command-line interface
+  - tui: Interactive terminal UI
+PackageUrl: https://github.com/stescobedo92/apppass
+Installers:
+  - Architecture: x64
+    InstallerType: nullsoft # This is a placeholder, usually Rust apps use exe or msi
+    InstallerUrl: https://github.com/stescobedo92/apppass/releases/download/v1.0.1/apppass-x86_64-pc-windows-msvc.zip
+    InstallerSha256: sha256:54c278ef2ce9fa2636f20601f50c07e6297e278c53f72d457db9018d4eca4c0d
+ManifestType: singleton
+ManifestVersion: 1.6.0
