@@ -1,8 +1,8 @@
 class Apppass < Formula
   desc "Generate secure passwords for your applications."
   homepage "https://github.com/stescobedo92/apppass"
-  url "https://github.com/stescobedo92/apppass/archive/refs/tags/v1.0.1.tar.gz"
-  sha256 "11915381500f2c0adc3b9a893027eb90cc37598fd2e639dec5d5921a8e7d9df5"
+  url "https://github.com/stescobedo92/apppass/archive/refs/tags/v1.0.0.tar.gz"
+  sha256 "ddeef950f2e12fc83e3d1633ff911ff5db2e768e1c2d7fa44097520f0a9fe0b0"
   license "MIT"
 
   depends_on "rust" => :build
@@ -18,7 +18,7 @@ class Apppass < Formula
       args << "--no-default-features" << "--features" << "tui"
     end
 
-    system "cargo", "install", *std_cargo_args(args: args)
+    system "cargo", "install", *std_cargo_args, *args
   end
 
   test do
