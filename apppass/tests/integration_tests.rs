@@ -7,54 +7,27 @@
 
 use std::process::Command;
 use std::sync::Once;
+use keyring::Entry;
 
 static KEYRING_CHECK: Once = Once::new();
 static mut KEYRING_AVAILABLE: bool = false;
 
-/// Check if keyring service is available by attempting to create a test entry
+/// Check if keyring service is available by attempting to use keyring directly
 fn check_keyring_availability() -> bool {
-    let test_app = "__keyring_probe_test__";
-    
-    // Try to create a password
-    let output = Command::new("cargo")
-        .arg("run")
-        .arg("--quiet")
-        .arg("--")
-        .arg("--app")
-        .arg(test_app)
-        .output();
-    
-    let available = match output {
-        Ok(out) => {
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let combined = format!("{}{}", stdout, stderr);
-            
-            // If we see D-Bus errors or platform failures, keyring is not available
-            let has_error = combined.contains("org.freedesktop.secrets") ||
-                combined.contains("DBus error") ||
-                combined.contains("secret service") ||
-                combined.contains("PlatformFailure") ||
-                combined.contains("was not provided by any .service files");
-            
-            if !has_error && out.status.success() {
-                // Cleanup test entry
-                let _ = Command::new("cargo")
-                    .arg("run")
-                    .arg("--quiet")
-                    .arg("--")
-                    .arg("--delete")
-                    .arg(test_app)
-                    .output();
-                true
-            } else {
-                false
+    let test_entry = Entry::new("apppass_integration_test_probe", "keyring_check");
+    match test_entry {
+        Ok(entry) => {
+            match entry.set_password("test_probe_password") {
+                Ok(_) => {
+                    // Cleanup
+                    let _ = entry.delete_credential();
+                    true
+                }
+                Err(_) => false
             }
         }
         Err(_) => false
-    };
-    
-    available
+    }
 }
 
 /// Check if keyring is available (cached)
