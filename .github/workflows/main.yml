@@ -30,7 +30,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libdbus-1-dev pkg-config
+          sudo apt-get install -y libdbus-1-dev pkg-config gnome-keyring
 
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
@@ -39,7 +39,17 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Run Tests
+      - name: Run Tests (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          eval $(dbus-launch --sh-syntax)
+          mkdir -p ~/.local/share/keyrings
+          eval $(echo -n "" | gnome-keyring-daemon --unlock)
+          eval $(echo -n "" | gnome-keyring-daemon --start)
+          cargo test -- --test-threads=1
+
+      - name: Run Tests (non-Linux)
+        if: runner.os != 'Linux'
         run: cargo test -- --test-threads=1
 
   build:
