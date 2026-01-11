@@ -6,6 +6,7 @@
     <title>apppass (Install)</title>
     <authors>Sergio Triana Escobedo</authors>
     <owners>stescobedo92</owners>
+    <iconUrl>https://raw.githubusercontent.com/stescobedo92/apppass/main/assets/binarycoffee.png</iconUrl>
     
     <projectUrl>https://github.com/stescobedo92/apppass</projectUrl>
     <packageSourceUrl>https://github.com/stescobedo92/apppass/packaging/chocolatey</packageSourceUrl>
