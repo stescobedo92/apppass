@@ -4,6 +4,7 @@ PackageIdentifier: stescobedo92.apppass
 PackageVersion: 1.0.0
 PackageName: apppass
 Publisher: stescobedo92
+PackageLocale: en-US
 License: MIT
 ShortDescription: Generate secure passwords for your applications.
 Description: |
