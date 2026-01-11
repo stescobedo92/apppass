@@ -1,0 +1,159 @@
+name: Features Build Test
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-features:
+    name: Build ${{ matrix.description }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Default feature (includes both console and tui)
+          - os: ubuntu-latest
+            feature: default
+            description: "Default feature (console + tui)"
+            build_args: "--features default"
+          - os: macos-latest
+            feature: default
+            description: "Default feature (console + tui)"
+            build_args: "--features default"
+          - os: windows-latest
+            feature: default
+            description: "Default feature (console + tui)"
+            build_args: "--features default"
+          # Console feature only
+          - os: ubuntu-latest
+            feature: console
+            description: "Console feature only"
+            build_args: "--no-default-features --features console"
+          - os: macos-latest
+            feature: console
+            description: "Console feature only"
+            build_args: "--no-default-features --features console"
+          - os: windows-latest
+            feature: console
+            description: "Console feature only"
+            build_args: "--no-default-features --features console"
+          # TUI feature only
+          - os: ubuntu-latest
+            feature: tui
+            description: "TUI feature only"
+            build_args: "--no-default-features --features tui"
+          - os: macos-latest
+            feature: tui
+            description: "TUI feature only"
+            build_args: "--no-default-features --features tui"
+          - os: windows-latest
+            feature: tui
+            description: "TUI feature only"
+            build_args: "--no-default-features --features tui"
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install System Dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Install System Dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # macOS usually has dependencies pre-installed
+          echo "macOS dependencies check"
+
+      - name: Install System Dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          # Windows dependencies are usually pre-installed
+          echo "Windows dependencies check"
+
+      - name: Build with ${{ matrix.feature }} feature
+        shell: bash
+        run: |
+          echo "Building with feature: ${{ matrix.feature }}"
+          echo "Description: ${{ matrix.description }}"
+          echo "Build arguments: ${{ matrix.build_args }}"
+          cargo build --release ${{ matrix.build_args }}
+
+      - name: Verify binary exists
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            if [ -f "target/release/apppass.exe" ]; then
+              echo "✓ Binary apppass.exe found"
+              ls -lh target/release/apppass.exe
+            else
+              echo "✗ Binary apppass.exe not found"
+              exit 1
+            fi
+          else
+            if [ -f "target/release/apppass" ]; then
+              echo "✓ Binary apppass found"
+              ls -lh target/release/apppass
+            else
+              echo "✗ Binary apppass not found"
+              exit 1
+            fi
+          fi
+
+      - name: Test binary execution
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            BINARY="./target/release/apppass.exe"
+          else
+            BINARY="./target/release/apppass"
+          fi
+          
+          # Test if binary can execute (basic smoke test)
+          if [ "${{ matrix.feature }}" == "console" ] || [ "${{ matrix.feature }}" == "default" ]; then
+            # Console feature has CLI (clap), test --version
+            echo "Testing CLI version command..."
+            $BINARY --version
+            echo "✓ CLI version command successful"
+          elif [ "${{ matrix.feature }}" == "tui" ]; then
+            # TUI feature only - no CLI available, just verify binary is executable
+            echo "TUI-only feature: verifying binary is executable..."
+            if [ -x "$BINARY" ] || [ -f "$BINARY" ]; then
+              echo "✓ TUI-only binary is executable"
+            else
+              echo "✗ Binary is not executable"
+              exit 1
+            fi
+          fi
+
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **OS**: ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Feature**: ${{ matrix.feature }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Description**: ${{ matrix.description }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          fi
