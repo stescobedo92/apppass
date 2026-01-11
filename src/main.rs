@@ -315,19 +315,44 @@ fn run_interactive_console() {
     println!("╚══════════════════════════════════════════╝");
     
     loop {
+        // Check password availability for menu display
+        let has_passwords = crate::app::keyring::has_any_passwords();
+        let has_auto = crate::app::keyring::has_auto_passwords();
+        let has_custom = crate::app::keyring::has_custom_passwords();
+        
         println!("\n┌──────────────────────────────────────────┐");
         println!("│              MAIN MENU                   │");
         println!("├──────────────────────────────────────────┤");
         println!("│  1. Create Password (Auto-generated)     │");
         println!("│  2. Create Password (Custom)             │");
-        println!("│  3. List All Passwords                   │");
+        if has_passwords {
+            println!("│  3. List All Passwords                   │");
+        } else {
+            println!("│  3. List All Passwords (No passwords)    │");
+        }
         println!("│  4. Get Password                         │");
-        println!("│  5. Update Password (Regenerate)         │");
-        println!("│  6. Update Password (Custom)             │");
-        println!("│  7. Delete Password                      │");
+        if has_auto {
+            println!("│  5. Update Password (Regenerate)         │");
+        } else {
+            println!("│  5. Update Password (Regenerate) (No auto)│");
+        }
+        if has_custom {
+            println!("│  6. Update Password (Custom)             │");
+        } else {
+            println!("│  6. Update Password (Custom) (No custom) │");
+        }
+        if has_passwords {
+            println!("│  7. Delete Password                      │");
+        } else {
+            println!("│  7. Delete Password (No passwords)       │");
+        }
         println!("│  8. Generate OTP                         │");
         println!("│  9. Generate Memorizable Password        │");
-        println!("│ 10. Export to CSV                        │");
+        if has_passwords {
+            println!("│ 10. Export to CSV                        │");
+        } else {
+            println!("│ 10. Export to CSV (No passwords)        │");
+        }
         println!("│ 11. Import from CSV                      │");
         println!("│  0. Exit                                 │");
         println!("└──────────────────────────────────────────┘");
@@ -376,6 +401,10 @@ fn run_interactive_console() {
                 }
             }
             "3" => {
+                if !crate::app::keyring::has_any_passwords() {
+                    println!("✗ No passwords to list");
+                    continue;
+                }
                 println!("\n--- Stored Passwords ---");
                 show_list_applications();
             }
@@ -390,6 +419,10 @@ fn run_interactive_console() {
                 }
             }
             "5" => {
+                if !crate::app::keyring::has_auto_passwords() {
+                    println!("✗ No auto-generated passwords to update");
+                    continue;
+                }
                 let app_name = prompt("Application name: ");
                 let length_str = prompt("New password length [30]: ");
                 let length: Option<usize> = if length_str.is_empty() {
@@ -407,6 +440,10 @@ fn run_interactive_console() {
                 }
             }
             "6" => {
+                if !crate::app::keyring::has_custom_passwords() {
+                    println!("✗ No custom passwords to update");
+                    continue;
+                }
                 let app_name = prompt("Application name: ");
                 let password = prompt("New password: ");
                 if password.is_empty() {
@@ -420,6 +457,10 @@ fn run_interactive_console() {
                 }
             }
             "7" => {
+                if !crate::app::keyring::has_any_passwords() {
+                    println!("✗ No passwords to delete");
+                    continue;
+                }
                 let app_name = prompt("Application name to delete: ");
                 let confirm = prompt(&format!("Delete '{}'? (y/N): ", app_name));
                 
@@ -463,6 +504,10 @@ fn run_interactive_console() {
                 }
             }
             "10" => {
+                if !crate::app::keyring::has_any_passwords() {
+                    println!("✗ No passwords to export");
+                    continue;
+                }
                 let path = prompt("Export file path: ");
                 match export_passwords(&path) {
                     Ok(_) => println!("✓ Exported to '{}'", path),
