@@ -26,12 +26,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install System Dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libdbus-1-dev pkg-config gnome-keyring
-
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -39,17 +33,7 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Run Tests (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          eval $(dbus-launch --sh-syntax)
-          mkdir -p ~/.local/share/keyrings
-          eval $(echo -n "" | gnome-keyring-daemon --unlock)
-          eval $(echo -n "" | gnome-keyring-daemon --start)
-          cargo test -- --test-threads=1
-
-      - name: Run Tests (non-Linux)
-        if: runner.os != 'Linux'
+      - name: Run Tests
         run: cargo test -- --test-threads=1
 
   build:
@@ -95,21 +79,16 @@ jobs:
           rm -f Cargo.toml.bak
           cat Cargo.toml | head -5
 
-      - name: Install System Dependencies
+      - name: Install Dependencies
         shell: bash
         run: |
-          if [[ "${{ matrix.config.runner }}" == "ubuntu-latest" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y libdbus-1-dev pkg-config
-          elif [[ "${{ matrix.config.runner }}" == "macos-latest" ]]; then
+          rustup target add ${{ matrix.config.target }}
+          
+          if [[ "${{ matrix.config.runner }}" == "macos-latest" ]]; then
             brew install filosottile/musl-cross/musl-cross || true
           elif [[ "${{ matrix.config.runner }}" == "windows-latest" ]]; then
             choco install zip -y
           fi
-
-      - name: Install Rust Target
-        shell: bash
-        run: rustup target add ${{ matrix.config.target }}
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -144,12 +123,12 @@ jobs:
         run: |
           cd dist
           if [[ "$(uname)" == "Darwin" ]]; then
-            shasum -a 256 * > sha256sums.txt
+            shasum -a 256 * > "sha256sums-${{ matrix.config.target }}.txt"
           else
-            sha256sum * > sha256sums.txt
+            sha256sum * > "sha256sums-${{ matrix.config.target }}.txt"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: binaries-${{ matrix.config.target }}
           path: dist/*
@@ -166,17 +145,19 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v3
         with:
           path: artifacts
           pattern: binaries-*
-          merge-multiple: true
 
       - name: Prepare Assets
         shell: bash
         run: |
           mkdir -p release_assets
           find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.txt" -o -name "apppass*" \) -exec cp {} release_assets/ \;
+          cd release_assets
+          cat sha256sums-*.txt > sha256sums.txt
+          rm sha256sums-*.txt
 
       - name: Get Version
         id: get_version

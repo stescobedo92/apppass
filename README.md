@@ -2,7 +2,7 @@
 
 [![Crates.io Link](https://crates.io/crates/apppass)](https://crates.io/crates/apppass)
 
-`apppass` is a powerful command-line application that allows you to generate, manage, and secure passwords efficiently. With advanced features like temporary passwords (OTP), memorable passwords, import/export, auto-lock, and an **interactive Terminal UI (TUI)**, `apppass` takes password management to the next level. ✨
+`apppass` is a powerful command-line application that allows you to generate, manage, and secure passwords efficiently. With advanced features like temporary passwords (OTP), memorable passwords, import/export, and auto-lock, `apppass` takes password management to the next level. ✨
 
 ---
 
@@ -10,9 +10,49 @@
 
 Install `apppass` easily with:
 
+### **Homebrew (macOS & Linux)**
+
+Install with default features (CLI + TUI):
 ```bash
-$ cargo install apppass
+brew install stescobedo92/tap/apppass
 ```
+
+Custom installations:
+```bash
+# Install only the CLI console
+brew install stescobedo92/tap/apppass --without-tui
+
+# Install only the interactive TUI
+brew install stescobedo92/tap/apppass --without-console
+```
+
+### **Winget (Windows)**
+
+```bash
+winget install apppass
+```
+*Note: The Winget package includes both CLI and TUI features by default.*
+
+### **Cargo (Rust Package Manager)**
+
+```bash
+# Install with all features (default - includes CLI and TUI)
+$ cargo install apppass
+
+# Install with only CLI (console) support
+$ cargo install apppass --no-default-features --features console
+
+# Install with only TUI (interactive UI) support  
+$ cargo install apppass --no-default-features --features tui
+```
+
+### **Available Features**
+
+| Feature | Description |
+|---------|-------------|
+| `console` | Command-line interface with all CLI commands |
+| `tui` | Interactive terminal UI with keyboard navigation |
+| `default` | Both `console` and `tui` features enabled |
 
 ---
 
@@ -24,36 +64,6 @@ $ cargo install apppass
 - 🔄 **Full Password Management**: List, update, delete, import, and export passwords.
 - 🕗 **Auto-Lock**: Locks the application after a period of inactivity.
 - 📂 **Export/Import**: Exchange passwords via CSV files.
-- 🖥️ **Interactive Terminal UI**: User-friendly TUI for all operations with Ratatui.
-
----
-
-## 🖥️ **Interactive UI Mode**
-
-Launch the interactive Terminal User Interface for a visual, menu-driven experience:
-
-```bash
-$ ./apppass --ui
-```
-
-The UI provides:
-- ✅ **Main Menu** with 11 options for all operations
-- ✅ **Create Password** (auto-generated or custom)
-- ✅ **List & View** passwords with navigation
-- ✅ **Update & Delete** passwords
-- ✅ **Generate OTP** with configurable TTL
-- ✅ **Memorable Passwords** generation
-- ✅ **Export/Import** to/from CSV files
-- ✅ **Keyboard navigation** (arrows, Enter, Esc, Tab)
-- ✅ **Context-sensitive help** in footer
-- ✅ **Visual feedback** with colored status messages
-
-### UI Navigation:
-- **↑↓**: Navigate menu items
-- **Enter**: Select option or confirm
-- **Tab**: Switch between input fields
-- **Esc**: Go back or cancel
-- **q**: Quit from main menu
 
 ---
 
@@ -117,11 +127,19 @@ Application 'gmail' deleted successfully.
 
 ### ♻️ **Update a Password**
 
-Update the password for an application:
+Update the password for an application (regenerates a new secure password):
 
 ```bash
 $ ./apppass --update gmail
-Password updated for 'gmail'.
+Password updated successfully for 'gmail'.
+New Password: xY9zK8mN7pQ6rS5t
+```
+
+Update with a custom password:
+
+```bash
+$ ./apppass --update-custom gmail --password "MySecurePassword123!"
+Password updated successfully for 'gmail'.
 ```
 
 ---
@@ -179,6 +197,33 @@ Configure an inactivity period after which the application locks:
 $ ./apppass --lock 60
 Auto-lock set to 60 seconds.
 ```
+
+---
+
+### 🖥️ **Interactive TUI Mode**
+
+Launch the interactive terminal user interface (requires `tui` feature):
+
+```bash
+$ ./apppass --ui
+```
+
+The TUI provides a menu-driven interface with keyboard navigation:
+- **↑↓**: Navigate menu items
+- **Enter**: Select option
+- **Tab**: Switch between input fields
+- **Esc**: Go back / Cancel
+- **q**: Quit
+
+Features available in TUI:
+- Create auto-generated or custom passwords
+- List and view all passwords
+- Update auto-generated passwords (regenerates new password)
+- Update custom passwords (edit password manually)
+- Delete passwords
+- Generate OTP and memorizable passwords
+- Export/Import passwords
+- Configure default password length
 
 ---
 
