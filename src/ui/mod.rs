@@ -56,7 +56,7 @@ fn run_app<B: ratatui::backend::Backend>(
     loop {
         terminal.draw(|f| ui_render::render(f, app))?;
 
-        if let Event::Key(key) = event_handler.next()? {
+        if let Some(Event::Key(key)) = event_handler.next()? {
             app.handle_key(key)?;
         }
 

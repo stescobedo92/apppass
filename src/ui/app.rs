@@ -288,6 +288,10 @@ impl App {
                     }
                     8 => {
                         // Export Passwords
+                        if !has_passwords {
+                            self.status_message = "✗ No passwords to export".to_string();
+                            return Ok(());
+                        }
                         self.mode = Mode::Export;
                         self.app_name_input.clear();  // Use for file path
                     }

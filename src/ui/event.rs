@@ -27,23 +27,22 @@ impl EventHandler {
         }
     }
 
-    /// Polls for the next event, blocking until one is available or timeout
-    pub fn next(&mut self) -> io::Result<Event> {
-        if event::poll(self.poll_timeout)? {
-            match event::read()? {
-                CrosstermEvent::Key(key) => {
-                    // Only process key press events, ignore release and repeat
-                    // This prevents duplicate characters when typing
-                    if key.kind == KeyEventKind::Press {
-                        return Ok(Event::Key(key));
-                    }
-                }
-                CrosstermEvent::Mouse(_) => return Ok(Event::Mouse),
-                CrosstermEvent::Resize(_, _) => return Ok(Event::Resize),
-                _ => {}
-            }
+    /// Polls for the next event, blocking until one is available or timeout.
+    /// Returns `None` if no event is available within the timeout period.
+    pub fn next(&mut self) -> io::Result<Option<Event>> {
+        if !event::poll(self.poll_timeout)? {
+            return Ok(None);
         }
-        // Return a resize event as a no-op on timeout
-        Ok(Event::Resize)
+
+        match event::read()? {
+            CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
+                // Only process key press events, ignore release and repeat
+                // This prevents duplicate characters when typing
+                Ok(Some(Event::Key(key)))
+            }
+            CrosstermEvent::Mouse(_) => Ok(Some(Event::Mouse)),
+            CrosstermEvent::Resize(_, _) => Ok(Some(Event::Resize)),
+            _ => Ok(None), // Ignore other event types
+        }
     }
 }
