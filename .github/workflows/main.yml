@@ -1,4 +1,4 @@
-﻿name: Rust CI/CD
+name: Rust CI/CD
 
 on:
   push:
@@ -149,7 +149,7 @@ jobs:
             sha256sum * > sha256sums.txt
           fi
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.config.target }}
           path: dist/*
@@ -166,10 +166,11 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
           pattern: binaries-*
+          merge-multiple: true
 
       - name: Prepare Assets
         shell: bash
