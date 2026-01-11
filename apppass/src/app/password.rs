@@ -223,6 +223,33 @@ pub fn generate_memorizable_password(app_name: &str) -> Result<(), KeyringError>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use keyring::Entry;
+
+    /// Check if keyring service is available (returns false on headless CI systems)
+    fn is_keyring_available() -> bool {
+        let test_entry = Entry::new("apppass_test_probe", "keyring_availability_check");
+        match test_entry {
+            Ok(entry) => {
+                match entry.set_password("test") {
+                    Ok(_) => {
+                        let _ = entry.delete_credential();
+                        true
+                    }
+                    Err(_) => false
+                }
+            }
+            Err(_) => false
+        }
+    }
+
+    macro_rules! skip_if_no_keyring {
+        () => {
+            if !is_keyring_available() {
+                eprintln!("Skipping test: keyring service not available (CI environment)");
+                return;
+            }
+        };
+    }
 
     fn cleanup_test_password(app_name: &str) {
         let _ = delete_password(app_name);
@@ -230,6 +257,7 @@ mod tests {
 
     #[test]
     fn test_get_password_for_specify_app() {
+        skip_if_no_keyring!();
         let app_name = "test_get_pw_app";
         cleanup_test_password(app_name);
         
@@ -250,6 +278,7 @@ mod tests {
 
     #[test]
     fn test_update_password() {
+        skip_if_no_keyring!();
         let app_name = "test_update_pw_app";
         cleanup_test_password(app_name);
         
@@ -272,6 +301,7 @@ mod tests {
 
     #[test]
     fn test_generate_save_safety_password_default_length() {
+        skip_if_no_keyring!();
         let app_name = "test_gen_pw_default";
         cleanup_test_password(app_name);
         
@@ -286,6 +316,7 @@ mod tests {
 
     #[test]
     fn test_generate_save_safety_password_custom_length() {
+        skip_if_no_keyring!();
         let app_name = "test_gen_pw_custom";
         cleanup_test_password(app_name);
         
@@ -300,6 +331,7 @@ mod tests {
 
     #[test]
     fn test_generate_save_safety_password_already_exists() {
+        skip_if_no_keyring!();
         let app_name = "test_gen_pw_exists";
         cleanup_test_password(app_name);
         
@@ -315,6 +347,7 @@ mod tests {
 
     #[test]
     fn test_delete_password() {
+        skip_if_no_keyring!();
         let app_name = "test_delete_pw_app";
         cleanup_test_password(app_name);
         
@@ -335,6 +368,7 @@ mod tests {
 
     #[test]
     fn test_update_password_regenerate() {
+        skip_if_no_keyring!();
         let app_name = "test_regen_pw_app";
         cleanup_test_password(app_name);
         
@@ -358,6 +392,7 @@ mod tests {
 
     #[test]
     fn test_generate_memorizable_password() {
+        skip_if_no_keyring!();
         let app_name = "test_memo_pw_app";
         cleanup_test_password(app_name);
         
@@ -380,6 +415,7 @@ mod tests {
 
     #[test]
     fn test_generate_memorizable_password_already_exists() {
+        skip_if_no_keyring!();
         let app_name = "test_memo_pw_exists";
         cleanup_test_password(app_name);
         
@@ -396,6 +432,7 @@ mod tests {
 
     #[test]
     fn test_generated_password_is_alphanumeric() {
+        skip_if_no_keyring!();
         let app_name = "test_alphanum_pw";
         cleanup_test_password(app_name);
         
@@ -409,6 +446,7 @@ mod tests {
 
     #[test]
     fn test_export_import_passwords_roundtrip() {
+        skip_if_no_keyring!();
         let app_name = "test_export_import_app";
         let test_file = "test_export_temp.csv";
         cleanup_test_password(app_name);

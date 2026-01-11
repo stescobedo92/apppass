@@ -191,6 +191,33 @@ pub fn generate_otp(app_name: &str, ttl_seconds: u64, length: usize) -> Result<S
 mod tests {
     use super::*;
     use crate::app::keyring::get_from_keyring;
+    use keyring::Entry;
+
+    /// Check if keyring service is available (returns false on headless CI systems)
+    fn is_keyring_available() -> bool {
+        let test_entry = Entry::new("apppass_test_probe", "keyring_availability_check");
+        match test_entry {
+            Ok(entry) => {
+                match entry.set_password("test") {
+                    Ok(_) => {
+                        let _ = entry.delete_credential();
+                        true
+                    }
+                    Err(_) => false
+                }
+            }
+            Err(_) => false
+        }
+    }
+
+    macro_rules! skip_if_no_keyring {
+        () => {
+            if !is_keyring_available() {
+                eprintln!("Skipping test: keyring service not available (CI environment)");
+                return;
+            }
+        };
+    }
 
     fn cleanup_test_otp(app_name: &str) {
         let _ = delete_otp(app_name);
@@ -198,6 +225,7 @@ mod tests {
 
     #[test]
     fn test_generate_otp_creates_password() {
+        skip_if_no_keyring!();
         let app_name = "test_otp_create_unique_123";
         cleanup_test_otp(app_name);
         
@@ -220,6 +248,7 @@ mod tests {
 
     #[test]
     fn test_generate_otp_saves_expiry() {
+        skip_if_no_keyring!();
         let app_name = "test_otp_expiry_save";
         cleanup_test_otp(app_name);
         
@@ -241,6 +270,7 @@ mod tests {
 
     #[test]
     fn test_is_otp_expired_false_initially() {
+        skip_if_no_keyring!();
         let app_name = "test_otp_not_expired";
         cleanup_test_otp(app_name);
         
@@ -254,6 +284,7 @@ mod tests {
 
     #[test]
     fn test_is_otp_expired_true_after_ttl() {
+        skip_if_no_keyring!();
         let app_name = "test_otp_expired_ttl_check";
         cleanup_test_otp(app_name);
         
@@ -280,6 +311,7 @@ mod tests {
 
     #[test]
     fn test_delete_otp_removes_password_and_expiry() {
+        skip_if_no_keyring!();
         let app_name = "test_otp_delete_unique_456";
         cleanup_test_otp(app_name);
         
@@ -306,6 +338,7 @@ mod tests {
 
     #[test]
     fn test_save_and_get_otp_expiry() {
+        skip_if_no_keyring!();
         let app_name = "test_otp_expiry_roundtrip";
         let timestamp = 1234567890u64;
         
@@ -344,6 +377,7 @@ mod tests {
 
     #[test]
     fn test_otp_length_variations() {
+        skip_if_no_keyring!();
         let test_cases = [5, 10, 20, 50];
         
         for (i, length) in test_cases.iter().enumerate() {
@@ -360,6 +394,7 @@ mod tests {
 
     #[test]
     fn test_otp_contains_alphanumeric_only() {
+        skip_if_no_keyring!();
         let app_name = "test_otp_alphanumeric";
         cleanup_test_otp(app_name);
         

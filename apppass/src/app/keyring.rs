@@ -336,12 +336,41 @@ mod tests {
     const TEST_APP_NAME: &str = "test_app_keyring";
     const TEST_PASSWORD: &str = "test_password_123";
 
+    /// Check if keyring service is available (returns false on headless CI systems)
+    fn is_keyring_available() -> bool {
+        let test_entry = Entry::new("apppass_test_probe", "keyring_availability_check");
+        match test_entry {
+            Ok(entry) => {
+                // Try to set and delete a test password
+                match entry.set_password("test") {
+                    Ok(_) => {
+                        let _ = entry.delete_credential();
+                        true
+                    }
+                    Err(_) => false
+                }
+            }
+            Err(_) => false
+        }
+    }
+
+    /// Skip test if keyring is not available
+    macro_rules! skip_if_no_keyring {
+        () => {
+            if !is_keyring_available() {
+                eprintln!("Skipping test: keyring service not available (CI environment)");
+                return;
+            }
+        };
+    }
+
     fn cleanup_test_entry(app_name: &str) {
         let _ = delete_from_keyring(app_name);
     }
 
     #[test]
     fn test_save_to_keyring() {
+        skip_if_no_keyring!();
         cleanup_test_entry(TEST_APP_NAME);
         let result = save_to_keyring(TEST_APP_NAME, TEST_PASSWORD);
         assert!(result.is_ok());
@@ -350,6 +379,7 @@ mod tests {
 
     #[test]
     fn test_get_from_keyring() {
+        skip_if_no_keyring!();
         cleanup_test_entry(TEST_APP_NAME);
         save_to_keyring(TEST_APP_NAME, TEST_PASSWORD).unwrap();
         let result = get_from_keyring(TEST_APP_NAME);
@@ -366,6 +396,7 @@ mod tests {
 
     #[test]
     fn test_delete_from_keyring() {
+        skip_if_no_keyring!();
         let test_app = "test_delete_keyring_entry";
         cleanup_test_entry(test_app);
         save_to_keyring(test_app, TEST_PASSWORD).unwrap();
@@ -377,6 +408,7 @@ mod tests {
 
     #[test]
     fn test_update_index_add_and_remove() {
+        skip_if_no_keyring!();
         let test_app = "test_index_app_unique";
         // Ensure clean state
         let _ = update_index(test_app, false);
@@ -402,6 +434,7 @@ mod tests {
 
     #[test]
     fn test_set_and_get_password_type() {
+        skip_if_no_keyring!();
         let test_app = "test_type_app";
         cleanup_test_entry(test_app);
         save_to_keyring(test_app, "password").unwrap();
@@ -439,6 +472,7 @@ mod tests {
 
     #[test]
     fn test_has_any_passwords_with_entry() {
+        skip_if_no_keyring!();
         let test_app = "test_has_passwords_app";
         cleanup_test_entry(test_app);
         
@@ -459,6 +493,7 @@ mod tests {
 
     #[test]
     fn test_show_list_applications() {
+        skip_if_no_keyring!();
         let test_app = "test_list_app";
         cleanup_test_entry(test_app);
         
@@ -472,6 +507,7 @@ mod tests {
 
     #[test]
     fn test_has_auto_passwords() {
+        skip_if_no_keyring!();
         let test_app = "test_auto_pw_app";
         cleanup_test_entry(test_app);
         
@@ -488,6 +524,7 @@ mod tests {
 
     #[test]
     fn test_has_custom_passwords() {
+        skip_if_no_keyring!();
         let test_app = "test_custom_pw_app";
         cleanup_test_entry(test_app);
         
@@ -504,6 +541,7 @@ mod tests {
 
     #[test]
     fn test_save_overwrite_password() {
+        skip_if_no_keyring!();
         let test_app = "test_overwrite_app";
         cleanup_test_entry(test_app);
         
@@ -518,6 +556,7 @@ mod tests {
 
     #[test]
     fn test_delete_also_removes_type_metadata() {
+        skip_if_no_keyring!();
         let test_app = "test_delete_meta_app";
         cleanup_test_entry(test_app);
         
