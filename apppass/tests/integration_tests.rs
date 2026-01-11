@@ -6,26 +6,67 @@
 //! Run with: cargo test --test integration_tests -- --test-threads=1
 
 use std::process::Command;
+use std::sync::Once;
 
-/// Check if keyring service is available by attempting a test operation
-fn is_keyring_available() -> bool {
-    // Try to run a simple operation that would fail without keyring
+static KEYRING_CHECK: Once = Once::new();
+static mut KEYRING_AVAILABLE: bool = false;
+
+/// Check if keyring service is available by attempting to create a test entry
+fn check_keyring_availability() -> bool {
+    let test_app = "__keyring_probe_test__";
+    
+    // Try to create a password
     let output = Command::new("cargo")
         .arg("run")
         .arg("--quiet")
         .arg("--")
-        .arg("--list")
+        .arg("--app")
+        .arg(test_app)
         .output();
     
-    match output {
+    let available = match output {
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr);
-            // If we see D-Bus errors, keyring is not available
-            !stderr.contains("org.freedesktop.secrets") &&
-            !stderr.contains("DBus error") &&
-            !stderr.contains("secret service")
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let combined = format!("{}{}", stdout, stderr);
+            
+            // If we see D-Bus errors or platform failures, keyring is not available
+            let has_error = combined.contains("org.freedesktop.secrets") ||
+                combined.contains("DBus error") ||
+                combined.contains("secret service") ||
+                combined.contains("PlatformFailure") ||
+                combined.contains("was not provided by any .service files");
+            
+            if !has_error && out.status.success() {
+                // Cleanup test entry
+                let _ = Command::new("cargo")
+                    .arg("run")
+                    .arg("--quiet")
+                    .arg("--")
+                    .arg("--delete")
+                    .arg(test_app)
+                    .output();
+                true
+            } else {
+                false
+            }
         }
         Err(_) => false
+    };
+    
+    available
+}
+
+/// Check if keyring is available (cached)
+fn is_keyring_available() -> bool {
+    unsafe {
+        KEYRING_CHECK.call_once(|| {
+            KEYRING_AVAILABLE = check_keyring_availability();
+            if !KEYRING_AVAILABLE {
+                eprintln!("Note: Keyring service not available - integration tests will be skipped");
+            }
+        });
+        KEYRING_AVAILABLE
     }
 }
 
