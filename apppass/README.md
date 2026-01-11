@@ -10,6 +10,31 @@
 
 Install `apppass` easily with:
 
+### **Homebrew (macOS & Linux)**
+
+Install with default features (CLI + TUI):
+```bash
+brew install stescobedo92/tap/apppass
+```
+
+Custom installations:
+```bash
+# Install only the CLI console
+brew install stescobedo92/tap/apppass --without-tui
+
+# Install only the interactive TUI
+brew install stescobedo92/tap/apppass --without-console
+```
+
+### **Winget (Windows)**
+
+```bash
+winget install apppass
+```
+*Note: The Winget package includes both CLI and TUI features by default.*
+
+### **Cargo (Rust Package Manager)**
+
 ```bash
 # Install with all features (default - includes CLI and TUI)
 $ cargo install apppass
