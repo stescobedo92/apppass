@@ -154,7 +154,7 @@ fn render_menu(f: &mut Frame, area: Rect, app: &App) {
         ("Delete Password", has_passwords),
         ("Generate OTP (One-Time Password)", true),
         ("Generate Memorizable Password", true),
-        ("Export Passwords to CSV", true),
+        ("Export Passwords to CSV", has_passwords),
         ("Import Passwords from CSV", true),
         ("Settings (Password Length)", true),
         ("Set Auto-Lock", true),
@@ -169,15 +169,15 @@ fn render_menu(f: &mut Frame, area: Rect, app: &App) {
                 format!("  {}  ", item)
             } else {
                 // Customize message based on menu item
-                let suffix = if i == 3 {
-                    // UpdateAuto
-                    "(No auto passwords)"
-                } else if i == 4 {
-                    // UpdateCustom
-                    "(No custom passwords)"
-                } else {
-                    "(No passwords)"
+                let suffix = match i {
+                    2 => "(No passwords)",           // List All Passwords
+                    3 => "(No auto passwords)",      // Update Auto-generated Password
+                    4 => "(No custom passwords)",    // Update Custom Password
+                    5 => "(No passwords)",           // Delete Password
+                    8 => "(No passwords)",          // Export Passwords to CSV
+                    _ => "(Unavailable)",
                 };
+                // Format disabled item text - keep it concise
                 format!("  {} {}  ", item, suffix)
             };
             
