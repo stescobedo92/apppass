@@ -137,7 +137,7 @@ jobs:
             sha256sum * > "sha256sums-${{ matrix.config.target }}.txt"
           fi
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.config.target }}
           path: dist/*
@@ -154,7 +154,7 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
           pattern: binaries-*
