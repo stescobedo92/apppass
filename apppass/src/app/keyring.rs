@@ -86,7 +86,23 @@ fn update_index(app_name: &str, add: bool) -> Result<(), KeyringError> {
         index.remove(app_name);
     }
 
-    let updated_index = index.into_iter().collect::<Vec<_>>().join(",");
+    // Filter out empty strings and metadata entries
+    let real_entries: Vec<String> = index
+        .into_iter()
+        .filter(|s| !s.is_empty() 
+            && s != crate::app::PASSWORD_LENGTH_KEY 
+            && !s.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+            && !s.ends_with(crate::app::OTP_EXPIRY_SUFFIX))
+        .collect();
+    
+    // If no real entries remain, delete the index entirely
+    if real_entries.is_empty() {
+        // Try to delete the index entry
+        let _ = entry.delete_credential();
+        return Ok(());
+    }
+
+    let updated_index = real_entries.join(",");
     entry.set_password(&updated_index)
 }
 
@@ -100,6 +116,7 @@ fn update_index(app_name: &str, add: bool) -> Result<(), KeyringError> {
 ///
 /// This function will panic if it fails to access the keyring or retrieve
 /// the index of applications.
+#[allow(dead_code)]
 pub fn show_list_applications() {
     let entry = Entry::new(APP_SERVICE, APP_INDEX);
     match entry {
@@ -107,6 +124,13 @@ pub fn show_list_applications() {
             Ok(data) => {
                 let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
                 for app_name in app_names {
+                    // Skip metadata entries and internal index
+                    if app_name == crate::app::PASSWORD_LENGTH_KEY 
+                        || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+                        || app_name.ends_with(crate::app::OTP_EXPIRY_SUFFIX)
+                        || app_name == APP_INDEX {
+                        continue;
+                    }
                     match get_from_keyring(app_name) {
                         Ok(password) => {
                             println!("Application Name: {}", app_name);
@@ -152,6 +176,7 @@ pub fn set_password_type(app_name: &str, password_type: &str) -> Result<(), Keyr
 /// # Returns
 ///
 /// * `Option<String>` - Returns Some("auto") or Some("custom"), or None if not set.
+#[allow(dead_code)]
 pub fn get_password_type(app_name: &str) -> Option<String> {
     let type_key = format!("{}{}", app_name, crate::app::PASSWORD_TYPE_SUFFIX);
     if let Ok(entry) = Entry::new(APP_SERVICE, &type_key) {
@@ -161,33 +186,104 @@ pub fn get_password_type(app_name: &str) -> Option<String> {
     }
 }
 
+/// Checks if there are any passwords stored in the keyring (either auto or custom).
+///
+/// # Returns
+///
+/// * `bool` - Returns true if there are any passwords stored.
+#[allow(dead_code)]
+pub fn has_any_passwords() -> bool {
+    if let Ok(entry) = Entry::new(APP_SERVICE, APP_INDEX) {
+        if let Ok(data) = entry.get_password() {
+            let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
+            
+            for app_name in app_names {
+                // Skip metadata entries and internal index
+                if app_name == crate::app::PASSWORD_LENGTH_KEY 
+                    || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+                    || app_name.ends_with(crate::app::OTP_EXPIRY_SUFFIX)
+                    || app_name == APP_INDEX {
+                    continue;
+                }
+                
+                // Found at least one real password
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Cleans up orphaned apppass_index if it exists but has no real passwords.
+/// Should be called at application startup.
+///
+/// # Returns
+///
+/// * `()` - This function does not return a value.
+pub fn cleanup_orphaned_index() {
+    if let Ok(entry) = Entry::new(APP_SERVICE, APP_INDEX) {
+        if let Ok(data) = entry.get_password() {
+            let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
+            let mut has_real_passwords = false;
+            
+            for app_name in &app_names {
+                // Skip metadata entries and internal index
+                if *app_name == crate::app::PASSWORD_LENGTH_KEY 
+                    || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+                    || app_name.ends_with(crate::app::OTP_EXPIRY_SUFFIX)
+                    || *app_name == APP_INDEX {
+                    continue;
+                }
+                
+                // Verify the password actually exists in keyring
+                if get_from_keyring(app_name).is_ok() {
+                    has_real_passwords = true;
+                    break;
+                }
+            }
+            
+            // If no real passwords exist, delete the index
+            if !has_real_passwords {
+                let _ = entry.delete_credential();
+            }
+        }
+    }
+}
+
 /// Checks if there are any auto-generated passwords in the keyring.
 ///
 /// # Returns
 ///
 /// * `bool` - Returns true if there are auto-generated passwords.
+#[allow(dead_code)]
 pub fn has_auto_passwords() -> bool {
     if let Ok(entry) = Entry::new(APP_SERVICE, APP_INDEX) {
         if let Ok(data) = entry.get_password() {
             let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
             let mut has_auto = false;
-            let mut has_any_typed = false;
+            let mut real_password_count = 0;
             
             for app_name in app_names {
-                // Skip metadata entries
-                if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
+                // Skip metadata entries and internal index
+                if app_name == crate::app::PASSWORD_LENGTH_KEY 
+                    || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+                    || app_name.ends_with(crate::app::OTP_EXPIRY_SUFFIX)
+                    || app_name == APP_INDEX {
                     continue;
                 }
-                if let Some(pw_type) = get_password_type(app_name) {
-                    has_any_typed = true;
-                    if pw_type == "auto" {
-                        has_auto = true;
-                    }
+                
+                // Count real passwords
+                real_password_count += 1;
+                
+                // Check password type (default to "auto" for legacy passwords without type)
+                let pw_type = get_password_type(app_name).unwrap_or_else(|| "auto".to_string());
+                if pw_type == "auto" {
+                    has_auto = true;
                 }
             }
             
-            // Return true if there are auto passwords, or if there are no typed passwords at all (all legacy)
-            return has_auto || !has_any_typed;
+            // Only return true if there are real passwords AND at least one is auto-generated
+            return real_password_count > 0 && has_auto;
         }
     }
     false
@@ -198,28 +294,35 @@ pub fn has_auto_passwords() -> bool {
 /// # Returns
 ///
 /// * `bool` - Returns true if there are custom passwords.
+#[allow(dead_code)]
 pub fn has_custom_passwords() -> bool {
     if let Ok(entry) = Entry::new(APP_SERVICE, APP_INDEX) {
         if let Ok(data) = entry.get_password() {
             let app_names: Vec<&str> = data.split(',').filter(|s| !s.is_empty()).collect();
             let mut has_custom = false;
-            let mut has_any_typed = false;
+            let mut real_password_count = 0;
             
             for app_name in app_names {
-                // Skip metadata entries
-                if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
+                // Skip metadata entries and internal index
+                if app_name == crate::app::PASSWORD_LENGTH_KEY 
+                    || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+                    || app_name.ends_with(crate::app::OTP_EXPIRY_SUFFIX)
+                    || app_name == APP_INDEX {
                     continue;
                 }
-                if let Some(pw_type) = get_password_type(app_name) {
-                    has_any_typed = true;
-                    if pw_type == "custom" {
-                        has_custom = true;
-                    }
+                
+                // Count real passwords
+                real_password_count += 1;
+                
+                // Check password type (default to "auto" for legacy passwords without type)
+                let pw_type = get_password_type(app_name).unwrap_or_else(|| "auto".to_string());
+                if pw_type == "custom" {
+                    has_custom = true;
                 }
             }
             
-            // Return true if there are custom passwords, or if there are no typed passwords at all (all legacy)
-            return has_custom || !has_any_typed;
+            // Only return true if there are real passwords AND at least one is custom
+            return real_password_count > 0 && has_custom;
         }
     }
     false
@@ -230,35 +333,202 @@ mod tests {
     use super::*;
     use keyring::Entry;
 
-    const TEST_APP_NAME: &str = "test_app";
-    const TEST_PASSWORD: &str = "test_password";
+    const TEST_APP_NAME: &str = "test_app_keyring";
+    const TEST_PASSWORD: &str = "test_password_123";
 
-    #[test]
-    fn test_save_to_keyring() {
-        let result = save_to_keyring(TEST_APP_NAME, TEST_PASSWORD);
-        assert!(result.is_ok());
+    fn cleanup_test_entry(app_name: &str) {
+        let _ = delete_from_keyring(app_name);
     }
 
     #[test]
-    fn test_delete_from_keyring() {
-        save_to_keyring(TEST_APP_NAME, TEST_PASSWORD).unwrap();
-        let result = delete_from_keyring(TEST_APP_NAME);
+    fn test_save_to_keyring() {
+        cleanup_test_entry(TEST_APP_NAME);
+        let result = save_to_keyring(TEST_APP_NAME, TEST_PASSWORD);
         assert!(result.is_ok());
+        cleanup_test_entry(TEST_APP_NAME);
+    }
+
+    #[test]
+    fn test_get_from_keyring() {
+        cleanup_test_entry(TEST_APP_NAME);
+        save_to_keyring(TEST_APP_NAME, TEST_PASSWORD).unwrap();
         let result = get_from_keyring(TEST_APP_NAME);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), TEST_PASSWORD);
+        cleanup_test_entry(TEST_APP_NAME);
+    }
+
+    #[test]
+    fn test_get_from_keyring_not_found() {
+        let result = get_from_keyring("non_existent_app_xyz_123");
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_update_index() {
-        let result = update_index(TEST_APP_NAME, true);
+    fn test_delete_from_keyring() {
+        let test_app = "test_delete_keyring_entry";
+        cleanup_test_entry(test_app);
+        save_to_keyring(test_app, TEST_PASSWORD).unwrap();
+        let result = delete_from_keyring(test_app);
         assert!(result.is_ok());
-        let entry = Entry::new(APP_SERVICE, APP_INDEX).unwrap();
-        let index = entry.get_password().unwrap();
-        assert!(index.contains(TEST_APP_NAME));
+        let result = get_from_keyring(test_app);
+        assert!(result.is_err());
+    }
 
-        let result = update_index(TEST_APP_NAME, false);
+    #[test]
+    fn test_update_index_add_and_remove() {
+        let test_app = "test_index_app_unique";
+        // Ensure clean state
+        let _ = update_index(test_app, false);
+        
+        // Add to index
+        let result = update_index(test_app, true);
         assert!(result.is_ok());
-        let index = entry.get_password().unwrap();
-        assert!(!index.contains(TEST_APP_NAME));
+        
+        // Re-read the index after adding
+        let entry = Entry::new(APP_SERVICE, APP_INDEX).unwrap();
+        let index = entry.get_password().unwrap_or_default();
+        assert!(index.contains(test_app), "Index should contain the added app");
+
+        // Remove from index
+        let result = update_index(test_app, false);
+        assert!(result.is_ok());
+        
+        // Re-read the index after removing (create new entry to refresh)
+        let entry = Entry::new(APP_SERVICE, APP_INDEX).unwrap();
+        let index = entry.get_password().unwrap_or_default();
+        assert!(!index.contains(test_app), "Index should not contain the removed app");
+    }
+
+    #[test]
+    fn test_set_and_get_password_type() {
+        let test_app = "test_type_app";
+        cleanup_test_entry(test_app);
+        save_to_keyring(test_app, "password").unwrap();
+        
+        // Set type to custom
+        let result = set_password_type(test_app, "custom");
+        assert!(result.is_ok());
+        
+        // Get type
+        let pw_type = get_password_type(test_app);
+        assert!(pw_type.is_some());
+        assert_eq!(pw_type.unwrap(), "custom");
+        
+        cleanup_test_entry(test_app);
+        // Cleanup type metadata
+        let type_key = format!("{}{}", test_app, crate::app::PASSWORD_TYPE_SUFFIX);
+        let _ = Entry::new(APP_SERVICE, &type_key).and_then(|e| e.delete_credential());
+    }
+
+    #[test]
+    fn test_get_password_type_default() {
+        // Non-existent app should return None
+        let result = get_password_type("non_existent_type_app");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_has_any_passwords_empty() {
+        // This test assumes the keyring might have entries
+        // The function should work without panicking
+        let _result = has_any_passwords();
+        // Just verify it doesn't panic
+        assert!(true);
+    }
+
+    #[test]
+    fn test_has_any_passwords_with_entry() {
+        let test_app = "test_has_passwords_app";
+        cleanup_test_entry(test_app);
+        
+        save_to_keyring(test_app, "password").unwrap();
+        
+        let result = has_any_passwords();
+        assert!(result);
+        
+        cleanup_test_entry(test_app);
+    }
+
+    #[test]
+    fn test_cleanup_orphaned_index() {
+        // Should not panic when called
+        cleanup_orphaned_index();
+        assert!(true);
+    }
+
+    #[test]
+    fn test_show_list_applications() {
+        let test_app = "test_list_app";
+        cleanup_test_entry(test_app);
+        
+        save_to_keyring(test_app, "password").unwrap();
+        
+        // Should not panic
+        show_list_applications();
+        
+        cleanup_test_entry(test_app);
+    }
+
+    #[test]
+    fn test_has_auto_passwords() {
+        let test_app = "test_auto_pw_app";
+        cleanup_test_entry(test_app);
+        
+        save_to_keyring(test_app, "password").unwrap();
+        let _ = set_password_type(test_app, "auto");
+        
+        let result = has_auto_passwords();
+        assert!(result);
+        
+        cleanup_test_entry(test_app);
+        let type_key = format!("{}{}", test_app, crate::app::PASSWORD_TYPE_SUFFIX);
+        let _ = Entry::new(APP_SERVICE, &type_key).and_then(|e| e.delete_credential());
+    }
+
+    #[test]
+    fn test_has_custom_passwords() {
+        let test_app = "test_custom_pw_app";
+        cleanup_test_entry(test_app);
+        
+        save_to_keyring(test_app, "password").unwrap();
+        let _ = set_password_type(test_app, "custom");
+        
+        let result = has_custom_passwords();
+        assert!(result);
+        
+        cleanup_test_entry(test_app);
+        let type_key = format!("{}{}", test_app, crate::app::PASSWORD_TYPE_SUFFIX);
+        let _ = Entry::new(APP_SERVICE, &type_key).and_then(|e| e.delete_credential());
+    }
+
+    #[test]
+    fn test_save_overwrite_password() {
+        let test_app = "test_overwrite_app";
+        cleanup_test_entry(test_app);
+        
+        save_to_keyring(test_app, "password1").unwrap();
+        save_to_keyring(test_app, "password2").unwrap();
+        
+        let result = get_from_keyring(test_app).unwrap();
+        assert_eq!(result, "password2");
+        
+        cleanup_test_entry(test_app);
+    }
+
+    #[test]
+    fn test_delete_also_removes_type_metadata() {
+        let test_app = "test_delete_meta_app";
+        cleanup_test_entry(test_app);
+        
+        save_to_keyring(test_app, "password").unwrap();
+        let _ = set_password_type(test_app, "custom");
+        
+        // Delete should also remove metadata
+        delete_from_keyring(test_app).unwrap();
+        
+        // Type should be None after deletion
+        let pw_type = get_password_type(test_app);
+        assert!(pw_type.is_none());
     }
 }

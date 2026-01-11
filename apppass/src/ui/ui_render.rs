@@ -148,7 +148,7 @@ fn render_menu(f: &mut Frame, area: Rect, app: &App) {
     let menu_items = vec![
         ("Create New Password (Auto-generated)", true),
         ("Create Custom Password", true),
-        ("List All Passwords", true),
+        ("List All Passwords", has_passwords),
         ("Update Auto-generated Password", has_auto),
         ("Update Custom Password", has_custom),
         ("Delete Password", has_passwords),
@@ -462,12 +462,12 @@ fn render_update_auto(f: &mut Frame, area: Rect, app: &App) {
         .split(area);
 
     // If editing app name, show input field
-    if !app.app_name_input.value.is_empty() {
+    if app.is_editing {
         let app_name_input = Paragraph::new(app.app_name_input.value.as_str())
             .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
             .block(
                 Block::default()
-                    .title("Edit Application Name")
+                    .title("Edit Application Name (Enter to save, Esc to cancel)")
                     .borders(Borders::ALL),
             );
         f.render_widget(app_name_input, chunks[0]);
@@ -549,7 +549,7 @@ fn render_update_custom(f: &mut Frame, area: Rect, app: &App) {
     }
 
     // If editing, show input fields
-    if !app.app_name_input.value.is_empty() {
+    if app.is_editing {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([

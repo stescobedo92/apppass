@@ -1,3 +1,5 @@
+#![cfg(feature = "tui")]
+
 mod app;
 mod event;
 mod ui_render;

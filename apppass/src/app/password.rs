@@ -9,22 +9,62 @@ use rand::{thread_rng, Rng};
 /// # Arguments
 ///
 /// * `app_name` - A string slice that holds the name of the application for which the password is retrieved.
+#[allow(dead_code)]
 pub fn get_password_for_specify_app(app_name: &str) -> Result<String, KeyringError> {
     get_from_keyring(app_name)
 }
 
-/// Updates the password for the specified application in the keyring.
+/// Updates the password for the specified application in the keyring with a custom password.
 ///
 /// # Arguments
 ///
 /// * `app_name` - A string slice that holds the name of the application for which the password is updated.
 /// * `new_password` - A string slice that holds the new password to be saved.
+#[allow(dead_code)]
 pub fn update_password(app_name: &str, new_password: &str) -> Result<(), KeyringError> {
     // Check if password exists before updating
     match get_from_keyring(app_name) {
         Ok(_) => {
             // Password exists, proceed with update
-            save_to_keyring(app_name, new_password)
+            save_to_keyring(app_name, new_password)?;
+            set_password_type(app_name, "custom")?;
+            Ok(())
+        }
+        Err(KeyringError::NoEntry) => {
+            Err(KeyringError::NoEntry)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Updates the password for the specified application by regenerating a new secure password.
+///
+/// # Arguments
+///
+/// * `app_name` - A string slice that holds the name of the application for which the password is updated.
+/// * `length` - An optional length for the generated password (defaults to 30).
+///
+/// # Returns
+///
+/// * `Result<String, KeyringError>` - Returns the new password on success.
+#[allow(dead_code)]
+pub fn update_password_regenerate(app_name: &str, length: Option<usize>) -> Result<String, KeyringError> {
+    // Check if password exists before updating
+    match get_from_keyring(app_name) {
+        Ok(_) => {
+            let length = length.unwrap_or(30);
+            
+            // Generate new secure password
+            let new_password: String = thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(length)
+                .map(char::from)
+                .collect();
+            
+            // Save the new password
+            save_to_keyring(app_name, &new_password)?;
+            set_password_type(app_name, "auto")?;
+            Ok(new_password)
         }
         Err(KeyringError::NoEntry) => {
             Err(KeyringError::NoEntry)
@@ -71,6 +111,7 @@ pub fn generate_save_safety_password(app_name: &str, length: Option<usize>) -> R
 /// # Arguments
 ///
 /// * `app_name` - A string slice that holds the name of the application for which the password is deleted.
+#[allow(dead_code)]
 pub fn delete_password(app_name: &str) -> Result<(), KeyringError> {
     delete_from_keyring(app_name)
 }
@@ -100,8 +141,10 @@ pub fn export_passwords(file_path: &str) -> Result<(), KeyringError> {
     let mut content = String::new();
 
     for app_name in app_names {
-        // Skip metadata entries (password_length and _type suffixes)
-        if app_name == crate::app::PASSWORD_LENGTH_KEY || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX) {
+        // Skip metadata entries (password_length, _type suffixes, and internal index)
+        if app_name == crate::app::PASSWORD_LENGTH_KEY 
+            || app_name.ends_with(crate::app::PASSWORD_TYPE_SUFFIX)
+            || app_name == crate::app::APP_INDEX {
             continue;
         }
         if let Ok(password) = get_from_keyring(app_name) {
@@ -180,82 +223,217 @@ pub fn generate_memorizable_password(app_name: &str) -> Result<(), KeyringError>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mockall::predicate::{eq, function};
-    use std::sync::Mutex;
-    use mockall::mock;
 
-    mock! {
-        pub Keyring {
-            fn get_password(&self, app_name: &str) -> Result<String, KeyringError>;
-            fn set_password(&self, app_name: &str, password: &str) -> Result<(), KeyringError>;
-            fn delete_password(&self, app_name: &str) -> Result<(), KeyringError>;
-        }
+    fn cleanup_test_password(app_name: &str) {
+        let _ = delete_password(app_name);
     }
 
     #[test]
     fn test_get_password_for_specify_app() {
-        let mut mock_keyring = MockKeyring::new();
-        mock_keyring.expect_get_password()
-            .with(eq("test_app"))
-            .returning(|_| Ok("test_password".to_string()));
-
-        let result = get_password_for_specify_app("test_app");
+        let app_name = "test_get_pw_app";
+        cleanup_test_password(app_name);
+        
+        save_to_keyring(app_name, "test_password").unwrap();
+        
+        let result = get_password_for_specify_app(app_name);
         assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "test_password");
+        
+        cleanup_test_password(app_name);
+    }
+
+    #[test]
+    fn test_get_password_not_found() {
+        let result = get_password_for_specify_app("non_existent_app_xyz_456");
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_update_password() {
-        let mut mock_keyring = MockKeyring::new();
-        mock_keyring.expect_set_password()
-            .with(eq("test_app"), eq("new_password"))
-            .returning(|_, _| Ok(()));
-
-        let result = update_password("test_app", "new_password");
+        let app_name = "test_update_pw_app";
+        cleanup_test_password(app_name);
+        
+        save_to_keyring(app_name, "old_password").unwrap();
+        
+        let result = update_password(app_name, "new_password");
         assert!(result.is_ok());
+        
+        let retrieved = get_from_keyring(app_name).unwrap();
+        assert_eq!(retrieved, "new_password");
+        
+        cleanup_test_password(app_name);
     }
 
     #[test]
-    fn test_generate_save_safety_password() {
-        let mut mock_keyring = MockKeyring::new();
-        mock_keyring.expect_set_password()
-            .with(eq("test_app"), function(|password: &str| password.len() == 30))
-            .returning(|_, _| Ok(()));
+    fn test_update_password_not_found() {
+        let result = update_password("non_existent_update_app", "password");
+        assert!(result.is_err());
+    }
 
-        let result = generate_save_safety_password("test_app", None);
+    #[test]
+    fn test_generate_save_safety_password_default_length() {
+        let app_name = "test_gen_pw_default";
+        cleanup_test_password(app_name);
+        
+        let result = generate_save_safety_password(app_name, None);
         assert!(result.is_ok());
+        
+        let password = get_from_keyring(app_name).unwrap();
+        assert_eq!(password.len(), 30); // Default length
+        
+        cleanup_test_password(app_name);
+    }
+
+    #[test]
+    fn test_generate_save_safety_password_custom_length() {
+        let app_name = "test_gen_pw_custom";
+        cleanup_test_password(app_name);
+        
+        let result = generate_save_safety_password(app_name, Some(15));
+        assert!(result.is_ok());
+        
+        let password = get_from_keyring(app_name).unwrap();
+        assert_eq!(password.len(), 15);
+        
+        cleanup_test_password(app_name);
+    }
+
+    #[test]
+    fn test_generate_save_safety_password_already_exists() {
+        let app_name = "test_gen_pw_exists";
+        cleanup_test_password(app_name);
+        
+        // First save should succeed
+        generate_save_safety_password(app_name, None).unwrap();
+        
+        // Second save should fail (already exists)
+        let result = generate_save_safety_password(app_name, None);
+        assert!(result.is_err());
+        
+        cleanup_test_password(app_name);
     }
 
     #[test]
     fn test_delete_password() {
-        let mut mock_keyring = MockKeyring::new();
-        mock_keyring.expect_delete_password()
-            .with(eq("test_app"))
-            .returning(|_| Ok(()));
-
-        let result = delete_password("test_app");
+        let app_name = "test_delete_pw_app";
+        cleanup_test_password(app_name);
+        
+        save_to_keyring(app_name, "password").unwrap();
+        
+        let result = delete_password(app_name);
         assert!(result.is_ok());
+        
+        let retrieved = get_from_keyring(app_name);
+        assert!(retrieved.is_err());
     }
 
     #[test]
-    fn test_export_passwords() {
-        let mut mock_keyring = MockKeyring::new();
-        mock_keyring.expect_get_password()
-            .with(eq("test_app"))
-            .returning(|_| Ok("test_password".to_string()));
+    fn test_delete_password_not_found() {
+        let result = delete_password("non_existent_delete_app");
+        assert!(result.is_err());
+    }
 
-        let application_data = Mutex::new(vec!["test_app".to_string()]);
-        let result = export_passwords("test_file.txt");
+    #[test]
+    fn test_update_password_regenerate() {
+        let app_name = "test_regen_pw_app";
+        cleanup_test_password(app_name);
+        
+        save_to_keyring(app_name, "old_password").unwrap();
+        
+        let result = update_password_regenerate(app_name, Some(20));
         assert!(result.is_ok());
+        
+        let new_password = result.unwrap();
+        assert_eq!(new_password.len(), 20);
+        assert_ne!(new_password, "old_password");
+        
+        cleanup_test_password(app_name);
+    }
+
+    #[test]
+    fn test_update_password_regenerate_not_found() {
+        let result = update_password_regenerate("non_existent_regen_app", None);
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_generate_memorizable_password() {
-        let mut mock_keyring = MockKeyring::new();
-        mock_keyring.expect_set_password()
-            .with(eq("test_app"), function(|password: &str| password.split('-').count() == 3))
-            .returning(|_, _| Ok(()));
-
-        let result = generate_memorizable_password("test_app");
+        let app_name = "test_memo_pw_app";
+        cleanup_test_password(app_name);
+        
+        let result = generate_memorizable_password(app_name);
         assert!(result.is_ok());
+        
+        let password = get_from_keyring(app_name).unwrap();
+        
+        // Should have 3 words separated by dashes
+        let parts: Vec<&str> = password.split('-').collect();
+        assert_eq!(parts.len(), 3);
+        
+        // Each part should not be empty
+        for part in parts {
+            assert!(!part.is_empty());
+        }
+        
+        cleanup_test_password(app_name);
+    }
+
+    #[test]
+    fn test_generate_memorizable_password_already_exists() {
+        let app_name = "test_memo_pw_exists";
+        cleanup_test_password(app_name);
+        
+        generate_memorizable_password(app_name).unwrap();
+        
+        let result = generate_memorizable_password(app_name);
+        assert!(result.is_err());
+        
+        cleanup_test_password(app_name);
+    }
+
+    // Note: update_app_name function doesn't exist in this module
+    // If needed in the future, implement it in password.rs
+
+    #[test]
+    fn test_generated_password_is_alphanumeric() {
+        let app_name = "test_alphanum_pw";
+        cleanup_test_password(app_name);
+        
+        generate_save_safety_password(app_name, Some(50)).unwrap();
+        
+        let password = get_from_keyring(app_name).unwrap();
+        assert!(password.chars().all(|c| c.is_alphanumeric()));
+        
+        cleanup_test_password(app_name);
+    }
+
+    #[test]
+    fn test_export_import_passwords_roundtrip() {
+        let app_name = "test_export_import_app";
+        let test_file = "test_export_temp.csv";
+        cleanup_test_password(app_name);
+        
+        // Create a password
+        save_to_keyring(app_name, "export_test_pwd").unwrap();
+        
+        // Export
+        let export_result = export_passwords(test_file);
+        assert!(export_result.is_ok());
+        
+        // Delete original
+        delete_password(app_name).unwrap();
+        
+        // Import
+        let import_result = import_passwords(test_file);
+        assert!(import_result.is_ok());
+        
+        // Verify imported
+        let retrieved = get_from_keyring(app_name);
+        assert!(retrieved.is_ok());
+        assert_eq!(retrieved.unwrap(), "export_test_pwd");
+        
+        // Cleanup
+        cleanup_test_password(app_name);
+        let _ = std::fs::remove_file(test_file);
     }
 }
