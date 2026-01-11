@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>apppass</id>
+    <version>1.0.0</version>
+    <title>apppass (Install)</title>
+    <authors>Sergio Triana Escobedo</authors>
+    <owners>stescobedo92</owners>
+    
+    <projectUrl>https://github.com/stescobedo92/apppass</projectUrl>
+    <packageSourceUrl>https://github.com/stescobedo92/apppass/packaging/chocolatey</packageSourceUrl>
+    <licenseUrl>https://github.com/stescobedo92/apppass/LICENSE</licenseUrl>
+    <bugTrackerUrl>https://github.com/stescobedo92/apppass/issues</bugTrackerUrl>
+    
+    <summary>Powerful command-line and TUI tool to generate and manage secure passwords.</summary>
+    <description>
+      apppass is a powerful command-line application written in Rust to generate and manage secure passwords.
+      It includes both a CLI console interface and an interactive TUI (Terminal User Interface).
+      
+      Features:
+      - console: Quick command-line interface for rapid generation.
+      - tui: Interactive terminal UI for a more visual experience.
+      - Highly secure and optimized for performance.
+    </description>
+    
+    <releaseNotes>https://github.com/stescobedo92/apppass/releases/tag/v1.0.0</releaseNotes>
+    <copyright>Copyright 2026 Sergio Triana Escobedo</copyright>
+    
+    <tags>apppass password-generator security cli tui rust cross-platform utility</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
