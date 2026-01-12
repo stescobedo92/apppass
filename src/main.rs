@@ -330,7 +330,11 @@ fn run_interactive_console() {
         } else {
             println!("│  3. List All Passwords (No passwords)    │");
         }
-        println!("│  4. Get Password                         │");
+        if has_passwords {
+            println!("│  4. Get Password                         │");
+        } else {
+            println!("│  4. Get Password (No passwords)          │");
+        }
         if has_auto {
             println!("│  5. Update Password (Regenerate)         │");
         } else {
@@ -346,8 +350,16 @@ fn run_interactive_console() {
         } else {
             println!("│  7. Delete Password (No passwords)       │");
         }
-        println!("│  8. Generate OTP                         │");
-        println!("│  9. Generate Memorizable Password        │");
+        if has_passwords {
+            println!("│  8. Generate OTP                         │");
+        } else {
+            println!("│  8. Generate OTP (No passwords)          │");
+        }
+        if has_passwords {
+            println!("│  9. Generate Memorizable Password        │");
+        } else {
+            println!("│  9. Generate Memorizable Password (No passwords)│");
+        }
         if has_passwords {
             println!("│ 10. Export to CSV                        │");
         } else {
@@ -409,6 +421,10 @@ fn run_interactive_console() {
                 show_list_applications();
             }
             "4" => {
+                if !crate::app::keyring::has_any_passwords() {
+                    println!("✗ No passwords to get");
+                    continue;
+                }
                 let app_name = prompt("Application name: ");
                 match get_password_for_specify_app(&app_name) {
                     Ok(password) => {
@@ -474,6 +490,10 @@ fn run_interactive_console() {
                 }
             }
             "8" => {
+                if !crate::app::keyring::has_any_passwords() {
+                    println!("✗ No passwords to generate OTP for");
+                    continue;
+                }
                 let app_name = prompt("OTP application name: ");
                 let ttl_str = prompt("TTL in seconds [300]: ");
                 let ttl: u64 = if ttl_str.is_empty() {
@@ -497,6 +517,10 @@ fn run_interactive_console() {
                 }
             }
             "9" => {
+                if !crate::app::keyring::has_any_passwords() {
+                    println!("✗ No passwords to generate memorizable for");
+                    continue;
+                }
                 let app_name = prompt("Application name: ");
                 match generate_memorizable_password(&app_name) {
                     Ok(_) => println!("✓ Memorizable password saved for '{}'", app_name),
