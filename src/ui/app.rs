@@ -276,6 +276,10 @@ impl App {
                     }
                     6 => {
                         // Generate OTP
+                        if !has_passwords {
+                            self.status_message = "✗ No passwords to generate OTP for".to_string();
+                            return Ok(());
+                        }
                         self.mode = Mode::GenerateOTP;
                         self.app_name_input.clear();
                         self.length_input.clear();  // Use for TTL
@@ -283,6 +287,10 @@ impl App {
                     }
                     7 => {
                         // Generate Memorizable Password
+                        if !has_passwords {
+                            self.status_message = "✗ No passwords to generate memorizable for".to_string();
+                            return Ok(());
+                        }
                         self.mode = Mode::Memorizable;
                         self.app_name_input.clear();
                     }
