@@ -147,6 +147,7 @@ jobs:
 
       - name: Build Summary
         if: always()
+        shell: bash
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **OS**: ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
