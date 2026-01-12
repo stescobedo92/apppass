@@ -152,8 +152,8 @@ fn render_menu(f: &mut Frame, area: Rect, app: &App) {
         ("Update Auto-generated Password", has_auto),
         ("Update Custom Password", has_custom),
         ("Delete Password", has_passwords),
-        ("Generate OTP (One-Time Password)", true),
-        ("Generate Memorizable Password", true),
+        ("Generate OTP (One-Time Password)", has_passwords),
+        ("Generate Memorizable Password", has_passwords),
         ("Export Passwords to CSV", has_passwords),
         ("Import Passwords from CSV", true),
         ("Settings (Password Length)", true),
@@ -174,6 +174,8 @@ fn render_menu(f: &mut Frame, area: Rect, app: &App) {
                     3 => "(No auto passwords)",      // Update Auto-generated Password
                     4 => "(No custom passwords)",    // Update Custom Password
                     5 => "(No passwords)",           // Delete Password
+                    6 => "(No passwords)",           // Generate OTP
+                    7 => "(No passwords)",           // Generate Memorizable Password
                     8 => "(No passwords)",          // Export Passwords to CSV
                     _ => "(Unavailable)",
                 };
